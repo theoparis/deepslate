@@ -202,14 +202,26 @@ void Game::place_player_at_spawn() {
     int sx = 0, sz = 0;
     if (li.spawn_set) { sx = li.spawn_x; sz = li.spawn_z; }
     else {
-      // Look for dry land near the origin.
+      // Look for flat, dry land near the origin (walking outward in rings).
       bool found = false;
-      for (int r = 0; r < 60 && !found; r++)
+      int fallback_x = 0, fallback_z = 0;
+      bool have_fallback = false;
+      for (int r = 0; r < 80 && !found; r++)
         for (int k = 0; k < std::max(1, r * 8) && !found; k++) {
           double a = k * 6.2831853 / std::max(1, r * 8);
-          int x = static_cast<int>(std::cos(a) * r * 8), z = static_cast<int>(std::sin(a) * r * 8);
-          if (gen_->surface_height(x, z) > WorldGen::SEA_LEVEL + 1 && gen_->surface_height(x, z) < 110) { sx = x; sz = z; found = true; }
+          int x = static_cast<int>(std::cos(a) * r * 6), z = static_cast<int>(std::sin(a) * r * 6);
+          int h = gen_->surface_height(x, z);
+          if (h <= WorldGen::SEA_LEVEL + 1 || h >= 100) continue;
+          if (!have_fallback) { fallback_x = x; fallback_z = z; have_fallback = true; }
+          int lo = h, hi = h;
+          for (auto [dx, dz] : {std::pair{5, 0}, {-5, 0}, {0, 5}, {0, -5}}) {
+            int hh = gen_->surface_height(x + dx, z + dz);
+            lo = std::min(lo, hh);
+            hi = std::max(hi, hh);
+          }
+          if (hi - lo <= 2 && lo > WorldGen::SEA_LEVEL) { sx = x; sz = z; found = true; }
         }
+      if (!found && have_fallback) { sx = fallback_x; sz = fallback_z; }
       li.spawn_x = sx; li.spawn_z = sz; li.spawn_y = gen_->surface_height(sx, sz) + 1;
       li.spawn_set = true;
     }
@@ -650,15 +662,14 @@ void Game::update(double dt) {
   if (use_script_input) in = scripted;
 
   // ---- fixed-step physics
-  static double accum = 0;
-  accum += dt;
+  physics_accum_ += dt;
   int steps = 0;
-  while (accum >= 1.0 / 60.0 && steps < 6) {
+  while (physics_accum_ >= 1.0 / 60.0 && steps < 6) {
     player_.update(1.0 / 60.0, in, *world_);
-    accum -= 1.0 / 60.0;
+    physics_accum_ -= 1.0 / 60.0;
     steps++;
   }
-  if (steps == 6) accum = 0;
+  if (steps == 6) physics_accum_ = 0;
   if (player_.pos.y() < MIN_Y - 64) { player_.pos.y() = 200; player_.vel.setZero(); }
 
   // ---- 20 Hz game tick: block updates

@@ -115,7 +115,7 @@ class Game {
   int inv_scroll_ = 0;
   double name_timer_ = 0;
   i64 world_ticks_ = 1000;
-  double tick_accum_ = 0, update_accum_ = 0;
+  double tick_accum_ = 0, update_accum_ = 0, physics_accum_ = 0;
   bool time_frozen_ = false;
   double autosave_timer_ = 0;
   int radius_ = 10;

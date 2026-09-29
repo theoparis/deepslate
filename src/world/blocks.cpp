@@ -106,7 +106,7 @@ void derive_shape(BlockInfo& bi) {
 u32 guess_flags(std::string_view n) {
   auto has = [&](std::string_view s) { return n.find(s) != std::string_view::npos; };
   if (has("leaves")) return BF_Solid | BF_Cutout | BF_Leaves | BF_Unknown;
-  if (has("glass") || has("ice") && !has("packed") && !has("blue")) return BF_Solid | BF_Cutout | BF_Unknown;
+  if (has("glass") || (has("ice") && !has("packed") && !has("blue"))) return BF_Solid | BF_Cutout | BF_Unknown;
   if (has("torch") || has("flower") || has("sapling") || has("grass") || has("fern") || has("vine") || has("tulip") || has("mushroom") ||
       has("bush") || has("orchid") || has("allium") || has("bluet") || has("daisy") || has("cornflower") || has("lily") || has("coral") ||
       has("kelp") || has("seagrass") || has("rail") || has("redstone_wire") || has("lever") || has("button") || has("sign") || has("banner") ||
