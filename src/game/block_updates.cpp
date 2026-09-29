@@ -37,13 +37,59 @@ void BlockUpdates::tick() {
   }
 }
 
+bool BlockUpdates::supported(const World& w, BlockId id, int x, int y, int z) {
+  Blocks& reg = Blocks::get();
+  const BlockInfo& bi = reg.info(id);
+  if (!bi.def || (bi.flags & BF_Unknown)) return true;
+  auto name_at = [&](int bx, int by, int bz) -> const std::string& {
+    static const std::string empty;
+    BlockId b = w.get_block(bx, by, bz);
+    return b ? reg.info(b).def->name : empty;
+  };
+  auto solid_at = [&](int bx, int by, int bz) {
+    BlockId b = w.get_block(bx, by, bz);
+    return b && reg.info(b).solid();
+  };
+  auto one_of = [](const std::string& n, std::initializer_list<const char*> names) {
+    for (const char* c : names)
+      if (n == c) return true;
+    return false;
+  };
+  const std::string& below = name_at(x, y - 1, z);
+  switch (bi.def->kind) {
+    case Kind::Torch: {
+      auto* f = find_state(bi.states, "torch_facing_direction");
+      const std::string dir = f ? f->s : "top";
+      if (dir == "top") return solid_at(x, y - 1, z);
+      if (dir == "east") return solid_at(x - 1, y, z);   // attached to the block behind it
+      if (dir == "west") return solid_at(x + 1, y, z);
+      if (dir == "south") return solid_at(x, y, z - 1);
+      return solid_at(x, y, z + 1);
+    }
+    case Kind::Cactus: return one_of(below, {"sand", "red_sand", "cactus"});
+    case Kind::Cross: {
+      const std::string& n = bi.def->name;
+      if (n == "reeds") return one_of(below, {"sand", "red_sand", "dirt", "coarse_dirt", "grass_block", "reeds"});
+      if (n == "deadbush") return one_of(below, {"sand", "red_sand", "dirt", "coarse_dirt"});
+      if (n == "brown_mushroom" || n == "red_mushroom") return solid_at(x, y - 1, z);
+      return one_of(below, {"grass_block", "dirt", "coarse_dirt"});
+    }
+    default: return true;
+  }
+}
+
 void BlockUpdates::run(int x, int y, int z) {
   if (!world_.column_loaded({floor_div(x, 16), floor_div(z, 16)})) return;
   BlockId id = world_.get_block(x, y, z);
   if (!id) return;
   const BlockInfo& bi = Blocks::get().info(id);
-  if (is_fluid(bi)) fluid(x, y, z, id);
-  else gravity(x, y, z, id);
+  if (is_fluid(bi)) { fluid(x, y, z, id); return; }
+  if (!supported(world_, id, x, y, z)) {  // plants/torches lose their support: drop away
+    world_.set_block(x, y, z, 0);
+    notify(x, y, z);
+    return;
+  }
+  gravity(x, y, z, id);
 }
 
 bool BlockUpdates::gravity(int x, int y, int z, BlockId id) {

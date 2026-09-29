@@ -90,6 +90,7 @@ struct BlockInfo {
   u8 nbox = 0;
   Box boxes[2]{};
   std::vector<std::pair<std::string, std::string>> java_props;  // for blockstate matching
+  std::string java_override;   // Java blockstate name when it depends on the states (wall_torch)
   std::string display;
   u32 color = 0xFF00FF;
 

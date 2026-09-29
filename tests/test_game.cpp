@@ -753,3 +753,99 @@ TEST(gravity_blocks_fall) {
   // Sand on solid ground stays put.
   CHECK_EQ(tw.world->get_block(0, 201, 0), B::sand);
 }
+
+static BlockId torch_facing(const char* dir) {
+  return Blocks::get().lookup_or_register("minecraft:torch", {{"torch_facing_direction", StateValue::string(dir)}});
+}
+
+TEST(support_rules_drop_unsupported_blocks) {
+  TestWorld tw("support");
+  CHECK(tw.load_around(0, 0, 2));
+  flat_floor(tw, 200, B::grass_block);
+  BlockUpdates up(*tw.world);
+  auto run = [&](int ticks = 10) { for (int i = 0; i < ticks; i++) up.tick(); };
+  // Plants on grass are fine; on stone or sand they are not.
+  CHECK(BlockUpdates::supported(*tw.world, B::short_grass, 0, 201, 0));
+  CHECK(BlockUpdates::supported(*tw.world, B::poppy, 3, 201, 3));
+  tw.world->set_block(4, 200, 4, B::stone);
+  tw.world->set_block(5, 200, 5, B::sand);
+  CHECK(!BlockUpdates::supported(*tw.world, B::poppy, 4, 201, 4));
+  CHECK(!BlockUpdates::supported(*tw.world, B::poppy, 5, 201, 5));
+  CHECK(BlockUpdates::supported(*tw.world, B::cactus, 5, 201, 5));
+  CHECK(!BlockUpdates::supported(*tw.world, B::cactus, 0, 201, 0));
+  CHECK(BlockUpdates::supported(*tw.world, B::dead_bush, 5, 201, 5));
+  CHECK(BlockUpdates::supported(*tw.world, B::sugar_cane, 5, 201, 5));
+
+  // Removing the ground drops the plant above it and, transitively, stacked sugar cane.
+  tw.world->set_block(5, 201, 5, B::sugar_cane);
+  tw.world->set_block(5, 202, 5, B::sugar_cane);
+  tw.world->set_block(5, 203, 5, B::sugar_cane);
+  tw.world->set_block(0, 201, 0, B::short_grass);
+  run();
+  CHECK_EQ(tw.world->get_block(5, 203, 5), B::sugar_cane);  // untouched while supported
+  tw.world->set_block(5, 200, 5, 0);
+  up.notify(5, 200, 5);
+  tw.world->set_block(0, 200, 0, 0);
+  up.notify(0, 200, 0);
+  run(30);
+  for (int y = 201; y <= 203; y++) CHECK_EQ(tw.world->get_block(5, y, 5), BlockId(0));
+  CHECK_EQ(tw.world->get_block(0, 201, 0), BlockId(0));
+
+  // Torches: standing ones need a block below, wall ones a block behind.
+  tw.world->set_block(8, 200, 8, B::stone);
+  CHECK(BlockUpdates::supported(*tw.world, B::torch, 8, 201, 8));
+  CHECK(!BlockUpdates::supported(*tw.world, B::torch, 9, 202, 8));
+  tw.world->set_block(12, 201, 12, B::stone);
+  CHECK(BlockUpdates::supported(*tw.world, torch_facing("east"), 13, 201, 12));   // hangs on the stone to its west
+  CHECK(BlockUpdates::supported(*tw.world, torch_facing("west"), 11, 201, 12));
+  CHECK(BlockUpdates::supported(*tw.world, torch_facing("north"), 12, 201, 11));  // north of the stone, pointing away from it
+  CHECK(BlockUpdates::supported(*tw.world, torch_facing("south"), 12, 201, 13));
+  CHECK(!BlockUpdates::supported(*tw.world, torch_facing("east"), 11, 201, 12));  // wrong side
+  tw.world->set_block(13, 201, 12, torch_facing("east"));
+  tw.world->set_block(8, 201, 8, B::torch);
+  run();
+  CHECK_EQ(tw.world->get_block(13, 201, 12), torch_facing("east"));
+  tw.world->set_block(12, 201, 12, 0);
+  up.notify(12, 201, 12);
+  tw.world->set_block(8, 200, 8, 0);
+  up.notify(8, 200, 8);
+  run(20);
+  CHECK_EQ(tw.world->get_block(13, 201, 12), BlockId(0));
+  CHECK_EQ(tw.world->get_block(8, 201, 8), BlockId(0));
+}
+
+TEST(wall_torch_model_and_shape) {
+  Models m;
+  BlockId east = torch_facing("east");
+  m.models->bake(east);
+  const BakedBlock* wall = m.models->baked(east);
+  const BakedBlock* stand = m.models->baked(B::torch);
+  CHECK(!wall->missing);
+  CHECK_EQ(wall->quads.size(), size_t{6});
+  // Leans away from the wall: the top of the flame is further east than its base.
+  float top_x = 0, bottom_x = 1;
+  for (auto& q : wall->quads)
+    for (int v = 0; v < 4; v++) {
+      if (q.pos[v][1] > 0.7f) top_x = std::max(top_x, q.pos[v][0]);
+      if (q.pos[v][1] < 0.3f) bottom_x = std::min(bottom_x, q.pos[v][0]);
+    }
+  CHECK(top_x > bottom_x + 0.1f);
+  CHECK(std::abs(wall->quads[0].pos[0][0] - stand->quads[0].pos[0][0]) > 0.05f);
+  // Facing rotates the model around the block: "south" leans toward +z.
+  BlockId south = torch_facing("south");
+  m.models->bake(south);
+  float top_z = 0, bottom_z = 1;
+  for (auto& q : m.models->baked(south)->quads)
+    for (int v = 0; v < 4; v++) {
+      if (q.pos[v][1] > 0.7f) top_z = std::max(top_z, q.pos[v][2]);
+      if (q.pos[v][1] < 0.3f) bottom_z = std::min(bottom_z, q.pos[v][2]);
+    }
+  CHECK(top_z > bottom_z + 0.1f);
+  // Selection boxes hug the supporting block.
+  Blocks& reg = Blocks::get();
+  CHECK_EQ(reg.info(east).boxes[0].min[0], 0.0f);
+  CHECK(reg.info(east).boxes[0].max[0] < 0.4f);
+  CHECK(reg.info(torch_facing("west")).boxes[0].max[0] == 1.0f);
+  CHECK_EQ(reg.info(east).emit, u8(14));
+  CHECK(!reg.info(east).solid());
+}

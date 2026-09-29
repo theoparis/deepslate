@@ -27,7 +27,7 @@ Usage: deepslate [options]
   --time <ticks>                 Start time of day (0 sunrise, 6000 noon, 12000 sunset, 18000 midnight)
   --script "<a;b;c>"             Scripted actions (for automated tests), e.g.
                                    "idle;shot a.png;look 90 20;break;idle;shot b.png;quit"
-                                 actions: wait N | idle | ground | nudge DX DY DZ | mark | assert_marked NAME | shot FILE | tp X Y Z | look YAW PITCH | break | place |
+                                 actions: wait N | idle | ground | setblock X Y Z NAME [k=v..] | nudge DX DY DZ | mark | assert_marked NAME | shot FILE | tp X Y Z | look YAW PITCH | break | place |
                                  select N | time T | freeze | fly on|off | walk FWD STRAFE FRAMES | jump FRAMES |
                                  inv | radius N | save | debug | log MSG | assert_block X Y Z NAME |
                                  assert_target NAME | assert_ground | quit

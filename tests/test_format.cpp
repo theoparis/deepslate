@@ -155,7 +155,7 @@ TEST(palette_entry_roundtrip) {
 static SubChunk random_subchunk(int palette_size, unsigned seed) {
   Blocks& reg = Blocks::get();
   std::vector<BlockId> pal;
-  for (int i = 0; i < palette_size; i++) pal.push_back(static_cast<BlockId>(1 + (i * 7) % (reg.count() - 1)));
+  for (int i = 0; i < palette_size; i++) pal.push_back(static_cast<BlockId>(1 + i % (reg.count() - 1)));  // distinct ids
   std::mt19937 rng(seed);
   SubChunk s;
   for (auto& b : s.b) b = pal[rng() % pal.size()];

@@ -17,6 +17,8 @@ class BlockUpdates {
   // Advances one game tick (call at 20 Hz).
   void tick();
   size_t pending() const { return queue_.size(); }
+  // Can `id` stand at (x,y,z)? Plants need soil, cacti sand, torches a solid block to hang on.
+  static bool supported(const World& w, BlockId id, int x, int y, int z);
   i64 now() const { return tick_; }
 
  private:

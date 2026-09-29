@@ -294,6 +294,10 @@ const char* kTorch = R"({"textures":{"particle":"#torch"},"elements":[{"from":[7
 "down":{"uv":[7,13,9,15],"texture":"#torch"},"up":{"uv":[7,6,9,8],"texture":"#torch"},
 "north":{"uv":[7,6,9,16],"texture":"#torch"},"south":{"uv":[7,6,9,16],"texture":"#torch"},
 "west":{"uv":[7,6,9,16],"texture":"#torch"},"east":{"uv":[7,6,9,16],"texture":"#torch"}}}]})";
+const char* kTorchWall = R"({"textures":{"particle":"#torch"},"elements":[{"from":[-1,3.5,7],"to":[1,13.5,9],"rotation":{"origin":[0,3.5,8],"axis":"z","angle":-22.5},"shade":false,"faces":{
+"down":{"uv":[7,13,9,15],"texture":"#torch"},"up":{"uv":[7,6,9,8],"texture":"#torch"},
+"north":{"uv":[7,6,9,16],"texture":"#torch"},"south":{"uv":[7,6,9,16],"texture":"#torch"},
+"west":{"uv":[7,6,9,16],"texture":"#torch"},"east":{"uv":[7,6,9,16],"texture":"#torch"}}}]})";
 const char* kCactus = R"({"textures":{"particle":"#side"},"elements":[{"from":[1,0,1],"to":[15,16,15],"faces":{
 "down":{"texture":"#bottom","cullface":"down"},"up":{"texture":"#top","cullface":"up"},"north":{"texture":"#side"},
 "south":{"texture":"#side"},"west":{"texture":"#side"},"east":{"texture":"#side"}}}]})";
@@ -334,6 +338,10 @@ class BuiltinPack : public PackSource {
     text(root + "models/block/slab_top.json", kSlabTop);
     text(root + "models/block/stairs.json", kStairs);
     text(root + "models/block/template_torch.json", kTorch);
+    text(root + "models/block/template_torch_wall.json", kTorchWall);
+    text(root + "models/block/wall_torch.json", model_json("minecraft:block/template_torch_wall", {{"torch", "minecraft:block/torch"}}));
+    text(root + "blockstates/wall_torch.json",
+         R"({"variants":{"facing=east":{"model":"minecraft:block/wall_torch"},"facing=south":{"model":"minecraft:block/wall_torch","y":90},"facing=west":{"model":"minecraft:block/wall_torch","y":180},"facing=north":{"model":"minecraft:block/wall_torch","y":270}}})");
     text(root + "models/block/template_cactus.json", kCactus);
 
     std::map<std::string, TexRecipe> recipes;

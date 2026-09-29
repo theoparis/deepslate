@@ -8,7 +8,6 @@ int selection_boxes(const BlockInfo& bi, Box out[2]) {
     for (int i = 0; i < bi.nbox; i++) out[i] = bi.boxes[i];
     return bi.nbox;
   }
-  if (bi.def && bi.def->kind == Kind::Torch) { out[0] = {{0.4375f, 0, 0.4375f}, {0.5625f, 0.625f, 0.5625f}}; return 1; }
   if (bi.flags & BF_Plant) { out[0] = {{0.15f, 0, 0.15f}, {0.85f, 0.8f, 0.85f}}; return 1; }
   out[0] = {{0, 0, 0}, {1, 1, 1}};
   return 1;

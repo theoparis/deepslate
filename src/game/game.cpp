@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 
 #include <algorithm>
+#include <cctype>
 #include <ctime>
 #include <filesystem>
 #include <sstream>
@@ -399,6 +400,12 @@ BlockId Game::placement_state(BlockId base, const RayHit& hit) const {
       set_state("weirdo_direction", StateValue::integer(dir));
       break;
     }
+    case Kind::Torch: {
+      // Attach to the clicked face: standing on top, or hanging on a wall facing away from it.
+      static const char* names[6] = {"top", "top", "north", "south", "west", "east"};
+      set_state("torch_facing_direction", StateValue::string(names[hit.face]));
+      break;
+    }
     default: return base;
   }
   return Blocks::get().lookup_or_register(bi.name, std::move(st));
@@ -411,18 +418,7 @@ void Game::break_block() {
   particles_->emit_break(world_->get_block(target_.x, target_.y, target_.z), target_.x, target_.y, target_.z, fx_rng_);
   world_->set_block(target_.x, target_.y, target_.z, 0);
   updates_->notify(target_.x, target_.y, target_.z);
-  // Plants, cacti, reeds and torches cannot float.
-  int y = target_.y + 1;
-  for (;;) {
-    BlockId above = world_->get_block(target_.x, y, target_.z);
-    if (!above) break;
-    const BlockInfo& ai = Blocks::get().info(above);
-    bool dependent = (ai.flags & BF_Plant) || (ai.def && (ai.def->kind == Kind::Torch || ai.def->kind == Kind::Cactus));
-    if (!dependent) break;
-    world_->set_block(target_.x, y, target_.z, 0);
-    updates_->notify(target_.x, y, target_.z);
-    y++;
-  }
+  // Dependent blocks (plants, torches) notice the missing support on the next update tick.
 }
 
 void Game::place_block() {
@@ -436,7 +432,9 @@ void Game::place_block() {
   if (!tinfo.replaceable()) { x += dv[target_.face][0]; y += dv[target_.face][1]; z += dv[target_.face][2]; }
   if (y < MIN_Y || y >= MAX_Y) return;
   if (!Blocks::get().info(world_->get_block(x, y, z)).replaceable()) return;
+  if (Blocks::get().info(held).def && Blocks::get().info(held).def->kind == Kind::Torch && target_.face == DOWN) return;  // no ceiling torches
   BlockId id = placement_state(held, target_);
+  if (!BlockUpdates::supported(*world_, id, x, y, z)) return;
   const BlockInfo& bi = Blocks::get().info(id);
   if (bi.nbox > 0 && bi.solid()) {
     AABB pb = player_.box();
@@ -470,6 +468,7 @@ int g_script_failures = 0;
 
 bool Game::run_script_action() {
   // Returns true when the action finished and the next one may start.
+  if (!pending_shot_.empty()) return false;  // wait for the frame that will be captured
   if (script_wait_ > 0) { script_wait_--; return false; }
   if (script_idle_) {
     if (world_settled() || now_seconds() > idle_deadline_) {
@@ -494,8 +493,31 @@ bool Game::run_script_action() {
   if (cmd == "wait") script_wait_ = static_cast<int>(num(1));
   else if (cmd == "ground") { script_ground_ = true; ground_deadline_ = now_seconds() + 30; }
   else if (cmd == "idle") { script_idle_ = true; idle_deadline_ = now_seconds() + 180; }
-  else if (cmd == "shot") { std::string f; is >> f; take_screenshot(f); log_info("script: saved {}", f); }
+  else if (cmd == "shot") { is >> pending_shot_; }  // captured after the next frame is drawn
   else if (cmd == "tp") { double x = num(), y = num(), z = num(); player_.pos = {x, y, z}; player_.vel.setZero(); }
+  else if (cmd == "setblock") {
+    // setblock X Y Z name [key=value ...]  (values: integers, *_bit as bytes, otherwise strings)
+    int x = static_cast<int>(num()), y = static_cast<int>(num()), z = static_cast<int>(num());
+    std::string name;
+    is >> name;
+    StateMap st;
+    std::string kv;
+    while (is >> kv) {
+      auto eq = kv.find('=');
+      if (eq == std::string::npos) continue;
+      std::string k = kv.substr(0, eq), v = kv.substr(eq + 1);
+      bool numeric = !v.empty() && std::all_of(v.begin(), v.end(), [](char c) { return std::isdigit(static_cast<unsigned char>(c)); });
+      if (numeric) st.emplace_back(k, k.ends_with("_bit") ? StateValue::byte(std::stoi(v)) : StateValue::integer(std::stoi(v)));
+      else st.emplace_back(k, StateValue::string(v));
+    }
+    BlockId id = 0;
+    if (name != "air") {
+      if (name.find(':') == std::string::npos) name = "minecraft:" + name;
+      id = st.empty() ? Blocks::get().find(name) : Blocks::get().lookup_or_register(name, st);
+    }
+    if (world_->set_block(x, y, z, id)) updates_->notify(x, y, z);
+    else if (!world_->column_loaded({floor_div(x, 16), floor_div(z, 16)})) log_warn("script: setblock outside loaded area");
+  }
   else if (cmd == "nudge") { double x = num(), y = num(), z = num(); player_.pos += Eigen::Vector3d(x, y, z); player_.vel.setZero(); }
   else if (cmd == "mark") {
     if (!target_.hit) { log_info("script: mark FAIL (no target)"); g_script_failures++; }
@@ -740,6 +762,11 @@ void Game::render() {
     if (screen_ == Screen::Pause) draw_pause();
   }
   ui_->end();
+  if (!pending_shot_.empty()) {
+    take_screenshot(pending_shot_);
+    log_info("script: saved {}", pending_shot_);
+    pending_shot_.clear();
+  }
 }
 
 void Game::draw_hud(int w, int h) {

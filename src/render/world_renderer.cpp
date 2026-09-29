@@ -47,8 +47,9 @@ void main() {
   float layer = vLayer + floor(mod(uTick / an.g, an.r)) + 0.0;
   vec4 t = texture(uTex, vec3(vUV, layer));
   if (t.a < uCut) discard;
-  float l = max(vLight.x * uSky, vLight.y);
-  float b = mix(0.035, 1.0, l * l * (0.35 + 0.65 * l));
+  // Sky light is neutral, block light (torches, lava, glowstone) is warm.
+  vec3 l = max(vec3(vLight.x * uSky), vec3(1.0, 0.87, 0.70) * vLight.y);
+  vec3 b = mix(vec3(0.035), vec3(1.0), l * l * (0.35 + 0.65 * l));
   vec3 c = t.rgb * vCol.rgb * b;
   float f = clamp((vDist - uFogStart) / max(uFogEnd - uFogStart, 0.001), 0.0, 1.0);
   oColor = vec4(mix(c, uFogColor, f), t.a * vCol.a);

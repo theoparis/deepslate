@@ -134,6 +134,7 @@ class Game {
   std::deque<std::string> script_;
   int script_wait_ = 0;
   int mark_[3] = {0, 0, 0};
+  std::string pending_shot_;
   bool script_idle_ = false, script_ground_ = false;
   double ground_deadline_ = 0;
   double idle_deadline_ = 0;

@@ -55,7 +55,19 @@ void derive_shape(BlockInfo& bi) {
   const BlockDef& d = *bi.def;
   auto full = [&] { bi.nbox = 1; bi.boxes[0] = {{0, 0, 0}, {1, 1, 1}}; };
   switch (d.kind) {
-    case Kind::Air: case Kind::Liquid: case Kind::Cross: case Kind::Torch: bi.nbox = 0; break;
+    case Kind::Air: case Kind::Liquid: case Kind::Cross: bi.nbox = 0; break;
+    case Kind::Torch: {
+      // Selection box only (torches have no collision). Wall torches hug the block they hang on.
+      std::string f = state_str(bi.states, "torch_facing_direction", "top");
+      bi.nbox = 1;
+      if (f == "east") bi.boxes[0] = {{0.0f, 0.219f, 0.344f}, {0.344f, 0.8125f, 0.656f}};
+      else if (f == "west") bi.boxes[0] = {{0.656f, 0.219f, 0.344f}, {1.0f, 0.8125f, 0.656f}};
+      else if (f == "south") bi.boxes[0] = {{0.344f, 0.219f, 0.0f}, {0.656f, 0.8125f, 0.344f}};
+      else if (f == "north") bi.boxes[0] = {{0.344f, 0.219f, 0.656f}, {0.656f, 0.8125f, 1.0f}};
+      else bi.boxes[0] = {{0.4375f, 0.0f, 0.4375f}, {0.5625f, 0.625f, 0.5625f}};
+      if (f != "top") { bi.java_override = "wall_torch"; bi.java_props = {{"facing", f}}; }
+      break;
+    }
     case Kind::Cactus: bi.nbox = 1; bi.boxes[0] = {{0.0625f, 0, 0.0625f}, {0.9375f, 0.9375f, 0.9375f}}; break;
     case Kind::Slab: {
       bool top = state_str(bi.states, "minecraft:vertical_half", "bottom") == "top";
@@ -141,7 +153,9 @@ Blocks::Blocks() {
       case Kind::Liquid:
         for (int depth = 0; depth <= 8; depth++) add_locked(full, {{"liquid_depth", StateValue::integer(depth)}});  // source, flowing 1-7, falling
         break;
-      case Kind::Torch: add_locked(full, {{"torch_facing_direction", StateValue::string("top")}}); break;
+      case Kind::Torch:
+        for (const char* f : {"top", "west", "east", "north", "south"}) add_locked(full, {{"torch_facing_direction", StateValue::string(f)}});
+        break;
       default:
         if (d.flags & BF_Leaves)
           add_locked(full, {{"persistent_bit", StateValue::byte(0)}, {"update_bit", StateValue::byte(0)}});

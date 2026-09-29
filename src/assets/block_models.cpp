@@ -589,7 +589,8 @@ void BlockModels::bake_locked(BlockId id) {
       lava_layer_ = add_layer_locked("block/lava_still");
     }
   } else {
-    std::string sname = bi.def && !(bi.flags & BF_Unknown) ? bi.def->java_name() : bi.name.substr(bi.name.find(':') + 1);
+    std::string sname = !bi.java_override.empty() ? bi.java_override
+                        : (bi.def && !(bi.flags & BF_Unknown) ? bi.def->java_name() : bi.name.substr(bi.name.find(':') + 1));
     const BlockState* bs = load_blockstate(sname);
     std::vector<ModelRef> refs;
     size_t variant_choices = 0;  // > 1: the first N refs are alternatives, not layers
