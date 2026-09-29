@@ -69,6 +69,8 @@ set(HAVE_TCMALLOC OFF CACHE BOOL "" FORCE)
 # Avoid the fork's PUBLIC -Werror.
 set(HAVE_CLANG_THREAD_SAFETY OFF CACHE BOOL "" FORCE)
 set(LEVELDB_DISABLE_RTTI ON CACHE BOOL "" FORCE)
+# Older Bedrock worlds tag zlib blocks with the id the fork also uses for zstd; accept both.
+set(LEVELDB_SUPPORT_LEGACY_ZLIB_ENUM ON CACHE BOOL "" FORCE)
 if(DS_ZLIB_SYSTEM)
   # The fork links a target literally called `zlib`.
   add_library(zlib INTERFACE)
