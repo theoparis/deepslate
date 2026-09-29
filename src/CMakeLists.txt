@@ -25,3 +25,6 @@ target_link_libraries(deepslate_core PUBLIC ds_options leveldb ds_zlib simdjson:
 
 add_executable(deepslate main.cpp)
 target_link_libraries(deepslate PRIVATE deepslate_core)
+
+add_executable(worldmap ../tools/worldmap.cpp)
+target_link_libraries(worldmap PRIVATE deepslate_core)

@@ -115,7 +115,7 @@ std::vector<BlockDef> build() {
   T.cube("red_sand", "Red Sand", 0xBF6A2E, TexStyle::Sand);
   T.cube("gravel", "Gravel", 0x837F7E, TexStyle::Gravel, 0x9C9896);
   T.cube("clay", "Clay", 0xA0A6B5, TexStyle::Noise);
-  T.cube("snow", "Snow", 0xFAFAFA, TexStyle::Snow);
+  T.cube("snow", "Snow", 0xFAFAFA, TexStyle::Snow).java = "snow_block";  // Bedrock "snow" is the full block
   T.cube("ice", "Ice", 0x9FBFFF, TexStyle::Ice, 0, BF_Solid | BF_Translucent);
   T.cube("packed_ice", "Packed Ice", 0x8DB4F0, TexStyle::Ice);
   T.cube("bedrock", "Bedrock", 0x3A3A3A, TexStyle::Bedrock, 0, SOLID | BF_Unbreakable);
@@ -199,7 +199,7 @@ std::vector<BlockDef> build() {
   // ---- plants
   T.plant("short_grass", "Short Grass", 0x7BBB4A, TexStyle::Plant, 0, Tint::Grass);
   T.plant("fern", "Fern", 0x6BAA4A, TexStyle::Fern, 0, Tint::Grass);
-  T.plant("dead_bush", "Dead Bush", 0x8A6A3A, TexStyle::DeadBush);
+  T.plant("deadbush", "Dead Bush", 0x8A6A3A, TexStyle::DeadBush, 0, Tint::None, "dead_bush");
   T.plant("dandelion", "Dandelion", 0xF0E020, TexStyle::Flower, 0xF0E020);
   T.plant("poppy", "Poppy", 0xD02020, TexStyle::Flower, 0xD02020);
   T.plant("blue_orchid", "Blue Orchid", 0x30B0F0, TexStyle::Flower, 0x30B0F0);

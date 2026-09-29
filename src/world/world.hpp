@@ -60,6 +60,8 @@ class World {
   // True (and fills `out`, ordered by dz then dx) when the 3x3 neighbourhood is fully loaded.
   bool snapshot3x3(ChunkPos c, std::array<ChunkSnapshot, 9>& out) const;
   bool neighbourhood_loaded(ChunkPos c) const;
+  // True when every chunk within `radius` (circular) of `c` is resident.
+  bool all_loaded_around(ChunkPos c, int radius) const;
 
   void take_dirty(std::vector<DirtyChunk>& out);
 
@@ -70,6 +72,7 @@ class World {
   size_t loaded_count() const { return chunks_.size(); }
   size_t inflight_count() const { return inflight_.size(); }
   size_t writer_queue() const { return writer_.queued(); }
+  u64 writer_written() const { return writer_.written(); }
   u64 chunks_generated() const { return generated_.load(); }
   u64 chunks_loaded_from_disk() const { return from_disk_.load(); }
   LevelStore& store() { return store_; }

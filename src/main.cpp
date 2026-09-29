@@ -22,13 +22,12 @@ Usage: deepslate [options]
   --size <w>x<h>                 Window size (default 1280x720)
   --fullscreen                   Start fullscreen
   --no-vsync                     Disable vsync
-  --survival                     New world in survival mode (creative is the default)
   --pos <x> <y> <z>              Start position
   --yaw <deg> --pitch <deg>      Start orientation
   --time <ticks>                 Start time of day (0 sunrise, 6000 noon, 12000 sunset, 18000 midnight)
   --script "<a;b;c>"             Scripted actions (for automated tests), e.g.
                                    "idle;shot a.png;look 90 20;break;idle;shot b.png;quit"
-                                 actions: wait N | idle | shot FILE | tp X Y Z | look YAW PITCH | break | place |
+                                 actions: wait N | idle | ground | nudge DX DY DZ | mark | assert_marked NAME | shot FILE | tp X Y Z | look YAW PITCH | break | place |
                                  select N | time T | freeze | fly on|off | walk FWD STRAFE FRAMES | jump FRAMES |
                                  inv | radius N | save | debug | log MSG | assert_block X Y Z NAME |
                                  assert_target NAME | assert_ground | quit
@@ -65,7 +64,6 @@ int main(int argc, char** argv) {
       if (std::sscanf(next("--size"), "%dx%d", &opt.width, &opt.height) != 2) { std::cerr << "bad --size\n"; return 2; }
     } else if (a == "--fullscreen") opt.fullscreen = true;
     else if (a == "--no-vsync") opt.vsync = false;
-    else if (a == "--survival") opt.survival = true;
     else if (a == "--pos") {
       double x = std::atof(next("--pos")), y = std::atof(next("--pos")), z = std::atof(next("--pos"));
       opt.start_pos = Eigen::Vector3d(x, y, z);

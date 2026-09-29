@@ -137,7 +137,7 @@ Blocks::Blocks() {
   ID(birch_leaves); ID(spruce_leaves); ID(oak_planks); ID(coal_ore); ID(iron_ore); ID(gold_ore); ID(copper_ore); ID(lapis_ore);
   ID(redstone_ore); ID(diamond_ore); ID(emerald_ore); ID(deepslate_coal_ore); ID(deepslate_iron_ore); ID(deepslate_gold_ore);
   ID(deepslate_copper_ore); ID(deepslate_lapis_ore); ID(deepslate_redstone_ore); ID(deepslate_diamond_ore); ID(short_grass); ID(fern);
-  ID(dandelion); ID(poppy); ID(cactus); ID(dead_bush); ID(torch); B::sugar_cane = id("reeds"); ID(glass); ID(obsidian); ID(pumpkin);
+  ID(dandelion); ID(poppy); ID(cactus); B::dead_bush = id("deadbush"); ID(torch); B::sugar_cane = id("reeds"); ID(glass); ID(obsidian); ID(pumpkin);
   ID(brown_mushroom); ID(red_mushroom); ID(azure_bluet); ID(oxeye_daisy); ID(cornflower); ID(allium); ID(blue_orchid); ID(red_tulip);
   ID(pink_tulip); ID(lily_of_the_valley); ID(spruce_planks); ID(birch_planks); ID(glowstone);
 #undef ID

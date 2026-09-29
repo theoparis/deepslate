@@ -131,6 +131,13 @@ bool World::neighbourhood_loaded(ChunkPos c) const {
   return true;
 }
 
+bool World::all_loaded_around(ChunkPos c, int r) const {
+  for (int dz = -r; dz <= r; dz++)
+    for (int dx = -r; dx <= r; dx++)
+      if (dx * dx + dz * dz <= r * r && !column_loaded({c.x + dx, c.z + dz})) return false;
+  return true;
+}
+
 bool World::snapshot3x3(ChunkPos c, std::array<ChunkSnapshot, 9>& out) const {
   int i = 0;
   for (int dz = -1; dz <= 1; dz++)

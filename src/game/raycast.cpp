@@ -20,8 +20,11 @@ RayHit raycast(const World& world, const Eigen::Vector3d& o, const Eigen::Vector
   int x = ifloor(o.x()), y = ifloor(o.y()), z = ifloor(o.z());
   const int sx = d.x() > 0 ? 1 : -1, sy = d.y() > 0 ? 1 : -1, sz = d.z() > 0 ? 1 : -1;
   const double inv[3] = {d.x() != 0 ? 1.0 / d.x() : 1e30, d.y() != 0 ? 1.0 / d.y() : 1e30, d.z() != 0 ? 1.0 / d.z() : 1e30};
+  const double dd[3] = {d.x(), d.y(), d.z()};
   double tmax[3] = {((sx > 0 ? x + 1 : x) - o.x()) * inv[0], ((sy > 0 ? y + 1 : y) - o.y()) * inv[1], ((sz > 0 ? z + 1 : z) - o.z()) * inv[2]};
-  const double tdelta[3] = {std::abs(inv[0]), std::abs(inv[1]), std::abs(inv[2])};
+  double tdelta[3] = {std::abs(inv[0]), std::abs(inv[1]), std::abs(inv[2])};
+  for (int a = 0; a < 3; a++)
+    if (dd[a] == 0) tmax[a] = tdelta[a] = 1e30;  // never step along an axis the ray does not move on
 
   for (int step = 0; step < 64; step++) {
     BlockId id = world.get_block(x, y, z);

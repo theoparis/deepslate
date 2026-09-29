@@ -633,7 +633,10 @@ void BlockModels::build() {
   lava_layer_ = add_layer_locked("block/lava_still");
   size_t missing = 0;
   for (BlockId id = 0; id < n; id++)
-    if (table_[id].load()->missing) missing++;
+    if (table_[id].load()->missing) {
+      missing++;
+      if (missing <= 8) log_warn("no model for block state {}", Blocks::get().info(id).name);
+    }
   log_info("baked {} block states, {} atlas layers ({}px), {} missing models", n, layers_.load(), tile_, missing);
 }
 

@@ -333,7 +333,7 @@ class BuiltinPack : public PackSource {
     text(root + "models/block/slab_top.json", kSlabTop);
     text(root + "models/block/stairs.json", kStairs);
     text(root + "models/block/template_torch.json", kTorch);
-    text(root + "models/block/cactus.json", kCactus);
+    text(root + "models/block/template_cactus.json", kCactus);
 
     std::map<std::string, TexRecipe> recipes;
     for (const BlockDef& d : builtin_defs()) {
@@ -408,7 +408,7 @@ class BuiltinPack : public PackSource {
           break;
         }
         case Kind::Cactus:
-          text(root + "models/block/" + n + ".json", model_json(mp + "cactus", {{"top", mp + d.tex[0]}, {"side", mp + d.tex[1]}, {"bottom", mp + d.tex[2]}}));
+          text(root + "models/block/" + n + ".json", model_json(mp + "template_cactus", {{"top", mp + d.tex[0]}, {"side", mp + d.tex[1]}, {"bottom", mp + d.tex[2]}}));
           text(root + "blockstates/" + n + ".json", simple_state("minecraft:block/" + n));
           break;
         case Kind::Torch:

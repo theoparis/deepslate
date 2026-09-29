@@ -9,8 +9,10 @@ float smoothstep(float a, float b, float x) {
   return t * t * (3 - 2 * t);
 }
 
-FastNoise::SmartNode<> make_fbm(int octaves, float gain = 0.5f, bool ridged = false) {
+// Fractal noise whose largest features are `scale` blocks across (FastNoise2 works in world units).
+FastNoise::SmartNode<> make_fbm(int octaves, float scale, float gain = 0.5f, bool ridged = false) {
   auto src = FastNoise::New<FastNoise::Simplex>();
+  src->SetScale(scale);
   if (ridged) {
     auto f = FastNoise::New<FastNoise::FractalRidged>();
     f->SetSource(src);
@@ -25,10 +27,10 @@ FastNoise::SmartNode<> make_fbm(int octaves, float gain = 0.5f, bool ridged = fa
   return f;
 }
 
-// Sample a 2D grid at world coordinates (x0.., z0..) with the given frequency.
-void grid2(const FastNoise::SmartNode<>& n, std::vector<float>& out, int x0, int z0, int nx, int nz, float freq, int seed) {
+// Sample a 2D grid at world coordinates (x0.., z0..), one sample per block.
+void grid2(const FastNoise::SmartNode<>& n, std::vector<float>& out, int x0, int z0, int nx, int nz, int seed) {
   out.resize(static_cast<size_t>(nx) * nz);
-  n->GenUniformGrid2D(out.data(), x0 * freq, z0 * freq, nx, nz, freq, freq, seed);
+  n->GenUniformGrid2D(out.data(), static_cast<float>(x0), static_cast<float>(z0), nx, nz, 1.0f, 1.0f, seed);
 }
 
 struct OreSpec {
@@ -40,45 +42,45 @@ struct OreSpec {
 }  // namespace
 
 WorldGen::WorldGen(i64 seed) : seed_(seed), s32_(static_cast<int>(mix64(static_cast<u64>(seed)) & 0x7FFFFFFF)) {
-  continental_ = make_fbm(5);
-  hills_ = make_fbm(4);
-  ridged_ = make_fbm(4, 0.5f, true);
-  temperature_ = make_fbm(2);
-  humidity_ = make_fbm(2);
-  cave_a_ = make_fbm(1);
-  cave_b_ = make_fbm(1);
-  cheese_ = make_fbm(2);
-  detail_ = make_fbm(2);
+  continental_ = make_fbm(5, 1100.0f);
+  hills_ = make_fbm(4, 170.0f);
+  ridged_ = make_fbm(4, 420.0f, 0.5f, true);
+  temperature_ = make_fbm(2, 1500.0f);
+  humidity_ = make_fbm(2, 1200.0f);
+  cave_a_ = make_fbm(2, 48.0f, 0.3f);
+  cave_b_ = make_fbm(2, 48.0f, 0.3f);
+  cheese_ = make_fbm(2, 90.0f);
+  detail_ = make_fbm(2, 22.0f);
 }
 
 void WorldGen::compute_columns(ChunkPos pos, ColumnGrid& out) const {
   thread_local std::vector<float> cont, hill, ridge, temp, hum, detail;
   const int x0 = pos.x * 16 - PAD, z0 = pos.z * 16 - PAD;
   // grid2 is indexed [z * EXT + x].
-  grid2(continental_, cont, x0, z0, EXT, EXT, 0.0011f, s32_);
-  grid2(hills_, hill, x0, z0, EXT, EXT, 0.0065f, s32_ + 101);
-  grid2(ridged_, ridge, x0, z0, EXT, EXT, 0.0028f, s32_ + 202);
-  grid2(temperature_, temp, x0, z0, EXT, EXT, 0.0007f, s32_ + 303);
-  grid2(humidity_, hum, x0, z0, EXT, EXT, 0.0009f, s32_ + 404);
-  grid2(detail_, detail, x0, z0, EXT, EXT, 0.05f, s32_ + 505);
+  grid2(continental_, cont, x0, z0, EXT, EXT, s32_);
+  grid2(hills_, hill, x0, z0, EXT, EXT, s32_ + 101);
+  grid2(ridged_, ridge, x0, z0, EXT, EXT, s32_ + 202);
+  grid2(temperature_, temp, x0, z0, EXT, EXT, s32_ + 303);
+  grid2(humidity_, hum, x0, z0, EXT, EXT, s32_ + 404);
+  grid2(detail_, detail, x0, z0, EXT, EXT, s32_ + 505);
 
   for (int z = 0; z < EXT; z++) {
     for (int x = 0; x < EXT; x++) {
       size_t i = static_cast<size_t>(z) * EXT + x;
-      float c = clampv(cont[i] * 1.6f, -1.0f, 1.0f);
+      float c = clampv(cont[i] * 0.85f + 0.12f, -1.0f, 1.0f);
       float land = smoothstep(-0.30f, 0.02f, c);
       float seafloor = clampv(50.0f + (c + 0.55f) * 55.0f, 14.0f, 58.0f);
       float base = lerp(seafloor, 65.0f + c * 14.0f, land);
-      float rough = 3.0f + 11.0f * land * (0.4f + 0.6f * clampv(hill[i] * 0.5f + 0.5f, 0.0f, 1.0f));
-      float h = base + hill[i] * rough + detail[i] * 1.2f;
-      float r = clampv(ridge[i] * 0.5f + 0.5f, 0.0f, 1.0f);
-      float mountain = std::max(0.0f, r - 0.55f) * 300.0f * smoothstep(0.05f, 0.45f, c);
+      const float hv = clampv(hill[i] * 0.6f, -1.2f, 1.2f);
+      float rough = 3.0f + 11.0f * land * (0.4f + 0.6f * clampv(hv * 0.5f + 0.5f, 0.0f, 1.0f));
+      float h = base + hv * rough + detail[i] * 1.2f;
+      float mountain = std::max(0.0f, ridge[i] - 0.85f) * 110.0f * smoothstep(0.0f, 0.5f, c);
       h += mountain;
       h = clampv(h, 8.0f, 300.0f);
       Column& col = out[i];
       col.height = static_cast<int>(h);
-      col.temp = temp[i] * 1.6f;
-      col.hum = hum[i] * 1.6f;
+      col.temp = temp[i];
+      col.hum = hum[i];
       // Cool down with altitude.
       float t = col.temp - std::max(0.0f, h - 100.0f) * 0.012f;
       u8 b;
@@ -142,12 +144,12 @@ void WorldGen::carve_and_fill(Chunk& c, const ColumnGrid& cols) const {
   ca.resize(16u * 16u * ny);
   cb.resize(ca.size());
   ch.resize(ca.size());
-  const float f = 0.022f;
   const int wx = c.pos.x * 16, wz = c.pos.z * 16;
-  cave_a_->GenUniformGrid3D(ca.data(), wx * f, y_lo * f * 1.4f, wz * f, 16, 16, ny, f, f, f * 1.4f, s32_ + 11);
-  cave_b_->GenUniformGrid3D(cb.data(), wx * f, y_lo * f * 1.4f, wz * f, 16, 16, ny, f, f, f * 1.4f, s32_ + 12);
-  const float fc = 0.011f;
-  cheese_->GenUniformGrid3D(ch.data(), wx * fc, y_lo * fc * 1.7f, wz * fc, 16, 16, ny, fc, fc, fc * 1.7f, s32_ + 13);
+  // Grid layout is x, then "y" (used for z), then "z" (used for world y); stretch y so caves run flat.
+  const float ys = 1.4f;
+  cave_a_->GenUniformGrid3D(ca.data(), static_cast<float>(wx), static_cast<float>(wz), y_lo * ys, 16, 16, ny, 1.0f, 1.0f, ys, s32_ + 11);
+  cave_b_->GenUniformGrid3D(cb.data(), static_cast<float>(wx), static_cast<float>(wz), y_lo * ys, 16, 16, ny, 1.0f, 1.0f, ys, s32_ + 12);
+  cheese_->GenUniformGrid3D(ch.data(), static_cast<float>(wx), static_cast<float>(wz), y_lo * 1.7f, 16, 16, ny, 1.0f, 1.0f, 1.7f, s32_ + 13);
 
   const BlockId stone = B::stone, deepslate = B::deepslate;
   for (int lx = 0; lx < 16; lx++) {
@@ -198,8 +200,8 @@ void WorldGen::carve_and_fill(Chunk& c, const ColumnGrid& cols) const {
             if (yi >= 0 && yi < ny) {
               size_t gi = static_cast<size_t>(yi) * 256 + static_cast<size_t>(lz) * 16 + lx;
               float a = ca[gi], b2 = cb[gi];
-              bool tunnel = std::abs(a) < 0.055f && std::abs(b2) < 0.055f;
-              bool cavern = ch[gi] > 0.62f && y < 48;
+              bool tunnel = std::abs(a) < 0.07f && std::abs(b2) < 0.07f;
+              bool cavern = ch[gi] > 1.1f && y < 48;
               int roof = h - y;
               if ((tunnel || cavern) && (roof > 4 || (tunnel && roof > 1 && h > SEA_LEVEL + 2))) {
                 id = y < -54 ? B::lava : 0;
@@ -354,7 +356,7 @@ void WorldGen::place_features(Chunk& c, const ColumnGrid& cols) const {
             else if (v < 0.175f) {
               static const BlockId flowers[] = {B::dandelion, B::poppy, B::azure_bluet, B::oxeye_daisy, B::cornflower, B::allium, B::red_tulip, B::pink_tulip, B::lily_of_the_valley};
               c.set(lx, h + 1, lz, flowers[(hv >> 20) % 9]);
-            } else if (v > 0.997f) c.set(lx, h + 1, lz, B::pumpkin);
+            } else if (v > 0.9995f) c.set(lx, h + 1, lz, B::pumpkin);
             break;
           case Biome::Taiga: case Biome::ColdTaiga:
             if (v < 0.08f) c.set(lx, h + 1, lz, B::fern);

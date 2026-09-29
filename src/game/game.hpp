@@ -23,7 +23,6 @@ struct Options {
   int width = 1280, height = 720;
   bool fullscreen = false;
   bool vsync = true;
-  bool survival = false;
   // Automation / testing
   std::string script;               // ";"-separated actions, see Game::run_script_action
   std::optional<Eigen::Vector3d> start_pos;
@@ -127,7 +126,9 @@ class Game {
   // script
   std::deque<std::string> script_;
   int script_wait_ = 0;
-  bool script_idle_ = false;
+  int mark_[3] = {0, 0, 0};
+  bool script_idle_ = false, script_ground_ = false;
+  double ground_deadline_ = 0;
   double idle_deadline_ = 0;
 };
 

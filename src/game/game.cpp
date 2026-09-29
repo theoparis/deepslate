@@ -93,7 +93,6 @@ bool Game::init_content(std::string* err) {
     *err = "cannot open world '" + opt_.world_dir + "': " + e;
     return false;
   }
-  if (opt_.survival) store_->info().game_type = 0;
   if (store_->is_new()) log_info("creating new world '{}' (seed {})", store_->info().name, store_->info().seed);
   else log_info("loaded world '{}' (seed {})", store_->info().name, store_->info().seed);
   gen_ = std::make_unique<WorldGen>(store_->info().seed);
@@ -126,7 +125,7 @@ bool Game::init_content(std::string* err) {
       }
     selected_ = clampv(pd.selected, 0, 8);
   }
-  player_.creative = store_->info().game_type == 1;
+  player_.creative = true;  // gameplay is creative-style regardless of the stored GameType
 
   for (auto& a : split(opt_.script, ';')) {
     std::string t = trim(a);
@@ -242,6 +241,7 @@ int Game::run() {
     if (fps_timer_ >= 0.5) { fps_ = fps_frames_ / fps_timer_; fps_frames_ = 0; fps_timer_ = 0; }
     if (opt_.max_frames >= 0 && static_cast<int>(frame_no_) >= opt_.max_frames) running_ = false;
   }
+  log_info("chunks: {} generated, {} loaded from disk, {} written", world_->chunks_generated(), world_->chunks_loaded_from_disk(), world_->writer_written());
   extern int g_script_failures;
   exit_code = g_script_failures ? 1 : 0;
   return exit_code;
@@ -448,12 +448,8 @@ void Game::pick_block() {
 }
 
 bool Game::world_settled() const {
-  int r = radius_ + 1;
-  size_t expected = 0;
-  for (int dz = -r; dz <= r; dz++)
-    for (int dx = -r; dx <= r; dx++)
-      if (dx * dx + dz * dz <= r * r) expected++;
-  return world_->inflight_count() == 0 && world_->loaded_count() >= expected && wr_->idle();
+  ChunkPos pc{floor_div(ifloor(player_.pos.x()), 16), floor_div(ifloor(player_.pos.z()), 16)};
+  return world_->all_loaded_around(pc, radius_ + 1) && world_->inflight_count() == 0 && wr_->idle();
 }
 
 int g_script_failures = 0;
@@ -470,6 +466,10 @@ bool Game::run_script_action() {
     return false;
   }
   if (forced_frames_ > 0) return false;
+  if (script_ground_) {
+    if (player_.on_ground || now_seconds() > ground_deadline_) { script_ground_ = false; script_wait_ = 2; }
+    return false;
+  }
   if (script_.empty()) return false;
   std::string line = script_.front();
   script_.pop_front();
@@ -478,9 +478,23 @@ bool Game::run_script_action() {
   is >> cmd;
   auto num = [&](double def = 0) { double v = def; is >> v; return v; };
   if (cmd == "wait") script_wait_ = static_cast<int>(num(1));
+  else if (cmd == "ground") { script_ground_ = true; ground_deadline_ = now_seconds() + 30; }
   else if (cmd == "idle") { script_idle_ = true; idle_deadline_ = now_seconds() + 180; }
   else if (cmd == "shot") { std::string f; is >> f; take_screenshot(f); log_info("script: saved {}", f); }
   else if (cmd == "tp") { double x = num(), y = num(), z = num(); player_.pos = {x, y, z}; player_.vel.setZero(); }
+  else if (cmd == "nudge") { double x = num(), y = num(), z = num(); player_.pos += Eigen::Vector3d(x, y, z); player_.vel.setZero(); }
+  else if (cmd == "mark") {
+    if (!target_.hit) { log_info("script: mark FAIL (no target)"); g_script_failures++; }
+    else { mark_[0] = target_.x; mark_[1] = target_.y; mark_[2] = target_.z; log_info("script: MARK {} {} {}", target_.x, target_.y, target_.z); }
+  } else if (cmd == "assert_marked") {
+    std::string want;
+    is >> want;
+    std::string got = Blocks::get().info(world_->get_block(mark_[0], mark_[1], mark_[2])).name;
+    if (got.starts_with("minecraft:")) got.erase(0, 10);
+    bool ok = got == want;
+    log_info("script: assert_marked {} : {}", want, ok ? "PASS" : std::format("FAIL (got {})", got));
+    if (!ok) g_script_failures++;
+  }
   else if (cmd == "look") { double y = num(), p = num(); player_.yaw = static_cast<float>(y * 3.14159265 / 180); player_.pitch = static_cast<float>(p * 3.14159265 / 180); }
   else if (cmd == "break") break_block();
   else if (cmd == "place") place_block();
@@ -494,6 +508,17 @@ bool Game::run_script_action() {
   else if (cmd == "radius") radius_ = clampv(static_cast<int>(num()), 2, 32);
   else if (cmd == "save") { save_all(true); }
   else if (cmd == "debug") show_debug_ = true;
+  else if (cmd == "where") {
+    log_info("script: pos {:.3f} {:.3f} {:.3f} yaw {:.1f} pitch {:.1f} ground {}", player_.pos.x(), player_.pos.y(), player_.pos.z(),
+             player_.yaw * 57.29578f, player_.pitch * 57.29578f, player_.on_ground);
+    if (target_.hit)
+      log_info("script: target {} {} {} face {} = {}", target_.x, target_.y, target_.z, target_.face,
+               Blocks::get().info(world_->get_block(target_.x, target_.y, target_.z)).name);
+    else log_info("script: no target");
+  } else if (cmd == "assert_hit") {
+    log_info("script: assert_hit : {}", target_.hit ? "PASS" : "FAIL");
+    if (!target_.hit) g_script_failures++;
+  }
   else if (cmd == "quit") running_ = false;
   else if (cmd == "log") { std::string rest; std::getline(is, rest); log_info("script: {}", trim(rest)); }
   else if (cmd == "assert_block") {
@@ -547,7 +572,7 @@ void Game::update(double dt) {
   // ---- script driver
   MoveInput scripted;
   bool use_script_input = false;
-  if (!script_.empty() || script_wait_ > 0 || script_idle_ || forced_frames_ > 0) {
+  if (!script_.empty() || script_wait_ > 0 || script_idle_ || script_ground_ || forced_frames_ > 0) {
     if (forced_frames_ > 0 && forced_input_) {
       scripted = *forced_input_;
       use_script_input = true;
