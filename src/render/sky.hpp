@@ -29,7 +29,9 @@ class SkyRenderer {
   void draw_lines(const Camera& cam);
   GLuint make_tex(const std::string& path, const PackStack& packs, int* w, int* h);
 
-  GLuint dome_prog_ = 0, quad_prog_ = 0, vao_ = 0, vbo_ = 0, sun_tex_ = 0, moon_tex_ = 0, empty_vao_ = 0;
+  GLuint dome_prog_ = 0, quad_prog_ = 0, vao_ = 0, vbo_ = 0, sun_tex_ = 0, empty_vao_ = 0;
+  GLuint moon_tex_[8] = {};      // one texture per phase (26.x layout), or all 0 when a sheet is used
+  GLuint moon_sheet_ = 0;        // legacy moon_phases.png: 4x2 cells
   int sun_w_ = 0, moon_w_ = 0, moon_h_ = 0;
   std::vector<V> verts_;
   std::vector<V> lines_;

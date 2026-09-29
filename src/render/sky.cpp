@@ -64,7 +64,8 @@ SkyRenderer::~SkyRenderer() {
   if (empty_vao_) gl::DeleteVertexArrays(1, &empty_vao_);
   if (vbo_) gl::DeleteBuffers(1, &vbo_);
   if (sun_tex_) gl::DeleteTextures(1, &sun_tex_);
-  if (moon_tex_) gl::DeleteTextures(1, &moon_tex_);
+  for (GLuint t : moon_tex_) if (t) gl::DeleteTextures(1, &t);
+  if (moon_sheet_) gl::DeleteTextures(1, &moon_sheet_);
 }
 
 GLuint SkyRenderer::make_tex(const std::string& path, const PackStack& packs, int* w, int* h) {
@@ -106,8 +107,10 @@ bool SkyRenderer::init(const PackStack& packs, std::string* err) {
 
   for (const char* p : {"environment/sun", "environment/celestial/sun"})
     if (!sun_tex_) sun_tex_ = make_tex(p, packs, &sun_w_, &moon_h_);
-  for (const char* p : {"environment/moon_phases", "environment/celestial/moon/full_moon", "environment/moon"})
-    if (!moon_tex_) moon_tex_ = make_tex(p, packs, &moon_w_, &moon_h_);
+  // Moon: eight per-phase files (26.x) in the order the game cycles them, else the legacy 4x2 sheet.
+  static const char* phases[8] = {"full_moon", "waning_gibbous", "third_quarter", "waning_crescent", "new_moon", "waxing_crescent", "first_quarter", "waxing_gibbous"};
+  for (int i = 0; i < 8; i++) moon_tex_[i] = make_tex(std::string("environment/celestial/moon/") + phases[i], packs, &moon_w_, &moon_h_);
+  if (!moon_tex_[0]) moon_sheet_ = make_tex("environment/moon_phases", packs, &moon_w_, &moon_h_);
 
   Rng rng(0xC0FFEE);
   for (int i = 0; i < 400; i++) {
@@ -221,15 +224,18 @@ void SkyRenderer::draw(const Camera& cam, const TimeOfDay& t, const SkyState& sk
   {
     const float white[4] = {1, 1, 1, 1};
     const float sun_fallback[4] = {1.0f, 0.95f, 0.7f, 1.0f};
-    add_quad(sun, 7.0f, sun_tex_ ? white : sun_fallback);
+    add_quad(sun, sun_tex_ ? 30.0f : 8.0f, sun_tex_ ? white : sun_fallback);  // textures have transparent padding
     flush_quads(cam, sun_tex_, sun_tex_ != 0);
     const float moon_fallback[4] = {0.85f, 0.87f, 0.95f, 1.0f};
-    add_quad(-sun, 5.0f, moon_tex_ ? white : moon_fallback);
-    // Moon-phase sheets are 4x2: use the full-moon cell.
-    if (moon_tex_ && moon_w_ > 0 && moon_h_ > 0 && moon_w_ >= moon_h_ * 2 - 1 && moon_w_ != moon_h_) {
-      for (auto& v : verts_) { v.u = v.u / 4.0f; v.v = v.v / 2.0f; }
+    const int phase = static_cast<int>((t.ticks / 24000) % 8 + 8) % 8;
+    GLuint mtex = moon_tex_[phase] ? moon_tex_[phase] : moon_sheet_;
+    add_quad(-sun, mtex ? 20.0f : 6.0f, mtex ? white : moon_fallback);
+    if (mtex && mtex == moon_sheet_) {
+      // Legacy sheet: pick the phase cell (4 columns x 2 rows).
+      float cu = static_cast<float>(phase % 4) / 4.0f, cv = static_cast<float>(phase / 4) / 2.0f;
+      for (auto& v : verts_) { v.u = cu + v.u / 4.0f; v.v = cv + v.v / 2.0f; }
     }
-    flush_quads(cam, moon_tex_, moon_tex_ != 0);
+    flush_quads(cam, mtex, mtex != 0);
   }
   gl::Disable(GL_BLEND);
 }
