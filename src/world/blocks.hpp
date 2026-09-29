@@ -120,7 +120,8 @@ class Blocks {
  private:
   Blocks();
   BlockId add_locked(std::string_view full_name, StateMap states);
-  std::unique_ptr<std::atomic<const BlockInfo*>[]> infos_;
+  std::unique_ptr<std::atomic<const BlockInfo*>[]> infos_;  // lock-free lookup table
+  std::vector<std::unique_ptr<BlockInfo>> owned_;            // ownership (guarded by m_)
   std::atomic<u32> count_{0};
   mutable std::shared_mutex m_;
   std::unordered_map<std::string, BlockId> by_key_;

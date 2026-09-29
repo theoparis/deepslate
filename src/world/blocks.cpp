@@ -196,7 +196,8 @@ BlockId Blocks::add_locked(std::string_view full_name, StateMap states) {
   if (bi->def == &unknown_def) bi->display = bi->name;
 
   BlockId id = static_cast<BlockId>(n);
-  const BlockInfo* raw = bi.release();
+  const BlockInfo* raw = bi.get();
+  owned_.push_back(std::move(bi));
   infos_[id].store(raw, std::memory_order_release);
   count_.store(n + 1, std::memory_order_release);
   by_key_.emplace(std::move(key), id);

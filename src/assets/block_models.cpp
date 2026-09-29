@@ -118,7 +118,7 @@ struct BlockModels::BlockState {
 
 BlockModels::~BlockModels() = default;
 
-BlockModels::BlockModels(const PackStack& packs) : packs_(packs) {
+BlockModels::BlockModels(const PackStack& packs, int max_layers) : packs_(packs) {
   table_ = std::make_unique<std::atomic<const BakedBlock*>[]>(65536);
   for (int i = 0; i < 65536; i++) table_[i].store(nullptr, std::memory_order_relaxed);
 
@@ -127,7 +127,7 @@ BlockModels::BlockModels(const PackStack& packs) : packs_(packs) {
     if (auto data = packs_.read(std::string("assets/minecraft/textures/") + probe + ".png"))
       if (auto img = decode_png(*data)) { tile_ = clampv(img->w, 8, 512); break; }
   }
-  capacity_ = std::max(256, std::min(2048, (96 * 1024 * 1024) / (tile_ * tile_ * 4)));
+  capacity_ = std::max(64, std::min({2048, max_layers, (96 * 1024 * 1024) / (tile_ * tile_ * 4)}));
   pixels_.reserve(static_cast<size_t>(capacity_) * tile_ * tile_ * 4);
 
   // Layer 0: the classic magenta/black "missing texture".

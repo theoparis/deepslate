@@ -73,7 +73,7 @@ TEST(worldgen_thread_safety) {
   std::atomic<int> bad{0};
   std::vector<std::thread> ts;
   for (int t = 0; t < 4; t++)
-    ts.emplace_back([&] {
+    ts.emplace_back([&, t] {
       for (int i = 0; i < 6; i++) {
         auto c = g.generate({3, 3});
         for (int s = 0; s < NUM_SUBS; s++) {

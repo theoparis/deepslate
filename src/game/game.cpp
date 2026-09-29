@@ -81,7 +81,9 @@ bool Game::init_content(std::string* err) {
   log_info("resource packs: {}", packs_.describe());
 
   Blocks& reg = Blocks::get();
-  models_ = std::make_unique<BlockModels>(packs_);
+  GLint max_layers = 256;
+  gl::GetIntegerv(GL_MAX_ARRAY_TEXTURE_LAYERS, &max_layers);
+  models_ = std::make_unique<BlockModels>(packs_, max_layers);
   models_->build();
   reg.set_listener([this](BlockId id) { models_->bake(id); });
 

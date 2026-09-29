@@ -35,6 +35,11 @@ endif()
 if(DEEPSLATE_SANITIZE)
   target_compile_options(ds_options INTERFACE -fsanitize=${DEEPSLATE_SANITIZE} -fno-omit-frame-pointer -g)
   target_link_options(ds_options INTERFACE -fsanitize=${DEEPSLATE_SANITIZE})
+  if(DEEPSLATE_SANITIZE MATCHES "undefined")
+    # LevelDB is built without RTTI, so the vptr check cannot see its type info.
+    target_compile_options(ds_options INTERFACE -fno-sanitize=vptr)
+    target_link_options(ds_options INTERFACE -fno-sanitize=vptr)
+  endif()
 endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")

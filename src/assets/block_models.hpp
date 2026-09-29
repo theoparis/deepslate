@@ -45,7 +45,8 @@ struct BakedBlock {
 
 class BlockModels {
  public:
-  explicit BlockModels(const PackStack& packs);
+  // `max_layers` is the GPU's array-texture layer limit (256 is the GL 3.3 minimum).
+  explicit BlockModels(const PackStack& packs, int max_layers = 2048);
   ~BlockModels();
 
   // Bakes every block registered so far. Call once before meshing starts.
