@@ -14,6 +14,7 @@ struct SkyState {
   float sky_light = 1.0f;         // 0 (night) .. 1 (day): scales sky light on world geometry
   float fog_color[3] = {0.7f, 0.8f, 1.0f};
   float fog_start = 100, fog_end = 160;
+  float anim_tick = 0;            // animated-texture clock (20 ticks per second)
   bool underwater = false;
 };
 
@@ -69,8 +70,8 @@ class WorldRenderer {
   World& world_;
   BlockModels& models_;
   ThreadPool& pool_;
-  GLuint program_ = 0, atlas_ = 0, ibo_ = 0;
-  GLint u_viewproj_ = -1, u_offset_ = -1, u_fog_color_ = -1, u_fog_start_ = -1, u_fog_end_ = -1, u_sky_ = -1, u_cut_ = -1, u_tex_ = -1;
+  GLuint program_ = 0, atlas_ = 0, ibo_ = 0, anim_tex_ = 0;
+  GLint u_viewproj_ = -1, u_offset_ = -1, u_fog_color_ = -1, u_fog_start_ = -1, u_fog_end_ = -1, u_sky_ = -1, u_cut_ = -1, u_tex_ = -1, u_anim_ = -1, u_tick_ = -1;
   size_t uploaded_layers_ = 0;
   size_t ibo_quads_ = 0;
 

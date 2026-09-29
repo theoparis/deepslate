@@ -85,6 +85,7 @@ struct BlockInfo {
   const BlockDef* def = nullptr;
   u32 flags = 0;
   u8 emit = 0;
+  u8 fluid_depth = 0;          // liquid_depth state: 0 source, 1..7 flowing, >= 8 falling
   Tint tint = Tint::None;
   u8 nbox = 0;
   Box boxes[2]{};

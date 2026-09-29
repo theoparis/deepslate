@@ -42,6 +42,7 @@ struct OreSpec {
 }  // namespace
 
 WorldGen::WorldGen(i64 seed) : seed_(seed), s32_(static_cast<int>(mix64(static_cast<u64>(seed)) & 0x7FFFFFFF)) {
+  (void)Blocks::get();  // block ids (B::*) are assigned when the registry is created
   continental_ = make_fbm(5, 1100.0f);
   hills_ = make_fbm(4, 170.0f);
   ridged_ = make_fbm(4, 420.0f, 0.5f, true);

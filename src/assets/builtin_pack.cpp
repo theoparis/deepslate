@@ -45,8 +45,9 @@ class Painter {
 
 u64 name_seed(const std::string& n) { return std::hash<std::string>{}(n); }
 
-Image paint(const TexRecipe& r) {
+Image paint(const TexRecipe& r, int frame = 0) {
   Painter p(name_seed(r.name));
+  const float phase = static_cast<float>(frame) * 0.7854f;  // 8 frames per cycle
   Rgb c1 = unpack(r.c1), c2 = unpack(r.c2);
   switch (r.style) {
     case TexStyle::Noise: p.fill_noise(c1, r.c2 == 1 ? 0.10f : 0.05f); break;
@@ -220,11 +221,11 @@ Image paint(const TexRecipe& r) {
       p.each([&](int x, int y) { p.set(x, y, Painter::mul(c1, 0.95f + p.rnd(x, y) * 0.1f), r.c1 == 0x9FBFFF ? 0.75f : 1.0f); });
       break;
     case TexStyle::Water:
-      p.each([&](int x, int y) { p.set(x, y, Painter::mul({0.75f, 0.85f, 1.0f}, 0.85f + 0.15f * std::sin((x + y * 0.5f) * 0.9f) + p.rnd(x, y) * 0.05f)); });
+      p.each([&](int x, int y) { p.set(x, y, Painter::mul({0.75f, 0.85f, 1.0f}, 0.85f + 0.15f * std::sin((x + y * 0.5f) * 0.9f - phase) + p.rnd(x, y) * 0.03f)); });
       break;
     case TexStyle::Lava:
       p.each([&](int x, int y) {
-        float v = 0.5f + 0.5f * std::sin(x * 0.7f + std::sin(y * 0.5f) * 2) * std::cos(y * 0.6f + x * 0.2f);
+        float v = 0.5f + 0.5f * std::sin(x * 0.7f + std::sin(y * 0.5f + phase) * 2) * std::cos(y * 0.6f + x * 0.2f - phase * 0.5f);
         p.set(x, y, {1.0f, 0.35f + 0.5f * v, 0.05f + 0.15f * p.rnd(x, y)});
       });
       break;
@@ -420,7 +421,20 @@ class BuiltinPack : public PackSource {
     }
     for (auto& [name, r] : recipes) {
       TexRecipe rc = r;
-      gen_[root + "textures/block/" + name + ".png"] = [rc] { return encode_png(paint(rc)); };
+      if (rc.style == TexStyle::Water || rc.style == TexStyle::Lava) {
+        // Animated like the real thing: a vertical strip of 8 frames plus a .mcmeta.
+        gen_[root + "textures/block/" + name + ".png"] = [rc] {
+          Image strip = Image::make(16, 16 * 8);
+          for (int f = 0; f < 8; f++) {
+            Image fr = paint(rc, f);
+            std::memcpy(strip.px(0, f * 16), fr.rgba.data(), fr.rgba.size());
+          }
+          return encode_png(strip);
+        };
+        text(root + "textures/block/" + name + ".png.mcmeta", R"({"animation":{"frametime":3}})");
+      } else {
+        gen_[root + "textures/block/" + name + ".png"] = [rc] { return encode_png(paint(rc)); };
+      }
     }
     gen_[root + "textures/colormap/grass.png"] = [] { return encode_png(make_colormap(false)); };
     gen_[root + "textures/colormap/foliage.png"] = [] { return encode_png(make_colormap(true)); };

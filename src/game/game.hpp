@@ -7,6 +7,7 @@
 
 #include "assets/block_models.hpp"
 #include "game/player.hpp"
+#include "game/block_updates.hpp"
 #include "game/raycast.hpp"
 #include "render/sky.hpp"
 #include "render/ui.hpp"
@@ -79,6 +80,7 @@ class Game {
   std::unique_ptr<WorldGen> gen_;
   std::unique_ptr<ThreadPool> pool_;
   std::unique_ptr<World> world_;
+  std::unique_ptr<BlockUpdates> updates_;
   std::unique_ptr<WorldRenderer> wr_;
   std::unique_ptr<SkyRenderer> sky_;
   std::unique_ptr<Ui> ui_;
@@ -108,7 +110,7 @@ class Game {
   int inv_scroll_ = 0;
   double name_timer_ = 0;
   i64 world_ticks_ = 1000;
-  double tick_accum_ = 0;
+  double tick_accum_ = 0, update_accum_ = 0;
   bool time_frozen_ = false;
   double autosave_timer_ = 0;
   int radius_ = 10;

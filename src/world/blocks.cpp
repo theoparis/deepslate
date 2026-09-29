@@ -86,6 +86,25 @@ void derive_shape(BlockInfo& bi) {
     if (d.kind == Kind::Column) bi.java_props = {{"axis", state_str(bi.states, "pillar_axis", "y")}};
   }
   if (d.kind == Kind::Grass) bi.java_props = {{"snowy", "false"}};
+  if (d.kind == Kind::Liquid) bi.fluid_depth = static_cast<u8>(clampv(state_int(bi.states, "liquid_depth"), 0, 15));
+}
+
+// Foreign blocks (from worlds made by the real game) have no definition: guess how they should
+// behave from their name so plants, glass, leaves and half blocks do not become opaque cubes.
+u32 guess_flags(std::string_view n) {
+  auto has = [&](std::string_view s) { return n.find(s) != std::string_view::npos; };
+  if (has("leaves")) return BF_Solid | BF_Cutout | BF_Leaves | BF_Unknown;
+  if (has("glass") || has("ice") && !has("packed") && !has("blue")) return BF_Solid | BF_Cutout | BF_Unknown;
+  if (has("torch") || has("flower") || has("sapling") || has("grass") || has("fern") || has("vine") || has("tulip") || has("mushroom") ||
+      has("bush") || has("orchid") || has("allium") || has("bluet") || has("daisy") || has("cornflower") || has("lily") || has("coral") ||
+      has("kelp") || has("seagrass") || has("rail") || has("redstone_wire") || has("lever") || has("button") || has("sign") || has("banner") ||
+      has("carpet") || has("pressure_plate") || has("web") || has("fire") || has("crop") || has("wheat") || has("carrots") || has("potatoes"))
+    return BF_Plant | BF_Cutout | BF_Unknown | BF_Replaceable * (has("grass") || has("fern") || has("vine") || has("bush"));
+  if (has("slab") || has("stairs") || has("fence") || has("wall") || has("door") || has("trapdoor") || has("bed") || has("chest") || has("lantern") ||
+      has("candle") || has("pane") || has("bars") || has("anvil"))
+    return BF_Solid | BF_Cutout | BF_Unknown;
+  if (has("water") || has("lava")) return BF_Liquid | BF_Unknown;
+  return BF_Solid | BF_Opaque | BF_Unknown;
 }
 
 }  // namespace
@@ -119,7 +138,9 @@ Blocks::Blocks() {
             add_locked(full, s);
           }
         break;
-      case Kind::Liquid: add_locked(full, {{"liquid_depth", StateValue::integer(0)}}); break;
+      case Kind::Liquid:
+        for (int depth = 0; depth <= 8; depth++) add_locked(full, {{"liquid_depth", StateValue::integer(depth)}});  // source, flowing 1-7, falling
+        break;
       case Kind::Torch: add_locked(full, {{"torch_facing_direction", StateValue::string("top")}}); break;
       default:
         if (d.flags & BF_Leaves)
@@ -166,6 +187,7 @@ BlockId Blocks::add_locked(std::string_view full_name, StateMap states) {
   }();
   bi->def = def ? def : &unknown_def;
   bi->flags = bi->def->flags;
+  if (bi->def == &unknown_def) bi->flags = guess_flags(short_name_of(full_name));
   bi->emit = bi->def->emit;
   bi->tint = bi->def->tint;
   bi->display = bi->def->display;

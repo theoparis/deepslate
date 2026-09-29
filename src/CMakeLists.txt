@@ -18,6 +18,7 @@ add_library(deepslate_core STATIC
   render/sky.cpp
   game/player.cpp
   game/raycast.cpp
+  game/block_updates.cpp
   game/game.cpp)
 target_include_directories(deepslate_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(deepslate_core PUBLIC ds_options leveldb ds_zlib simdjson::simdjson Eigen3::Eigen

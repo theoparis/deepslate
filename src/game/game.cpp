@@ -101,6 +101,7 @@ bool Game::init_content(std::string* err) {
   pool_ = std::make_unique<ThreadPool>(threads);
   log_info("worker threads: {}", threads);
   world_ = std::make_unique<World>(*store_, *gen_, *pool_);
+  updates_ = std::make_unique<BlockUpdates>(*world_);
   wr_ = std::make_unique<WorldRenderer>(*world_, *models_, *pool_);
   if (!wr_->init(&e)) { *err = "world renderer: " + e; return false; }
   sky_ = std::make_unique<SkyRenderer>();
@@ -148,6 +149,7 @@ void Game::shutdown() {
   if (!window_ && !world_) return;
   if (store_ && world_) save_all(true);
   wr_.reset();
+  updates_.reset();
   ui_.reset();
   sky_.reset();
   world_.reset();
@@ -399,6 +401,7 @@ void Game::break_block() {
   const BlockInfo& bi = Blocks::get().info(world_->get_block(target_.x, target_.y, target_.z));
   if (bi.flags & BF_Unbreakable && !player_.creative) return;
   world_->set_block(target_.x, target_.y, target_.z, 0);
+  updates_->notify(target_.x, target_.y, target_.z);
   // Plants, cacti, reeds and torches cannot float.
   int y = target_.y + 1;
   for (;;) {
@@ -408,6 +411,7 @@ void Game::break_block() {
     bool dependent = (ai.flags & BF_Plant) || (ai.def && (ai.def->kind == Kind::Torch || ai.def->kind == Kind::Cactus));
     if (!dependent) break;
     world_->set_block(target_.x, y, target_.z, 0);
+    updates_->notify(target_.x, y, target_.z);
     y++;
   }
 }
@@ -433,6 +437,7 @@ void Game::place_block() {
     }
   }
   world_->set_block(x, y, z, id);
+  updates_->notify(x, y, z);
 }
 
 void Game::pick_block() {
@@ -625,6 +630,11 @@ void Game::update(double dt) {
   if (steps == 6) accum = 0;
   if (player_.pos.y() < MIN_Y - 64) { player_.pos.y() = 200; player_.vel.setZero(); }
 
+  // ---- 20 Hz game tick: block updates
+  update_accum_ += dt;
+  for (int i = 0; i < 4 && update_accum_ >= 0.05; i++) { updates_->tick(); update_accum_ -= 0.05; }
+  if (update_accum_ > 0.2) update_accum_ = 0;
+
   // ---- time
   if (!time_frozen_) {
     tick_accum_ += dt * 20.0;
@@ -683,6 +693,7 @@ void Game::take_screenshot(const std::string& path) {
 void Game::render() {
   const TimeOfDay tod(world_ticks_);
   SkyState sky = SkyRenderer::make_state(tod, radius_ * 16.0f);
+  sky.anim_tick = static_cast<float>(now_seconds() * 20.0);
   if (player_.eyes_in_water) {
     float l = 0.25f + 0.75f * sky.sky_light;
     sky.fog_color[0] = 0.05f * l; sky.fog_color[1] = 0.18f * l; sky.fog_color[2] = 0.45f * l;

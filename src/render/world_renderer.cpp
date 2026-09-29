@@ -34,6 +34,8 @@ in vec4 vCol;
 in vec2 vLight;
 in float vDist;
 uniform sampler2DArray uTex;
+uniform sampler2D uAnim;   // (frame count, ticks per frame) per base layer
+uniform float uTick;
 uniform vec3 uFogColor;
 uniform float uFogStart;
 uniform float uFogEnd;
@@ -41,7 +43,9 @@ uniform float uSky;
 uniform float uCut;
 out vec4 oColor;
 void main() {
-  vec4 t = texture(uTex, vec3(vUV, vLayer));
+  vec2 an = texelFetch(uAnim, ivec2(int(vLayer + 0.5), 0), 0).rg;
+  float layer = vLayer + floor(mod(uTick / an.g, an.r)) + 0.0;
+  vec4 t = texture(uTex, vec3(vUV, layer));
   if (t.a < uCut) discard;
   float l = max(vLight.x * uSky, vLight.y);
   float b = mix(0.035, 1.0, l * l * (0.35 + 0.65 * l));
@@ -66,6 +70,7 @@ WorldRenderer::~WorldRenderer() {
   for (auto& [k, s] : sections_) { free_mesh(s.opaque); free_mesh(s.trans); }
   if (ibo_) gl::DeleteBuffers(1, &ibo_);
   if (atlas_) gl::DeleteTextures(1, &atlas_);
+  if (anim_tex_) gl::DeleteTextures(1, &anim_tex_);
   if (program_) gl::DeleteProgram(program_);
 }
 
@@ -80,6 +85,8 @@ bool WorldRenderer::init(std::string* err) {
   u_sky_ = gl::GetUniformLocation(program_, "uSky");
   u_cut_ = gl::GetUniformLocation(program_, "uCut");
   u_tex_ = gl::GetUniformLocation(program_, "uTex");
+  u_anim_ = gl::GetUniformLocation(program_, "uAnim");
+  u_tick_ = gl::GetUniformLocation(program_, "uTick");
 
   gl::GenTextures(1, &atlas_);
   gl::BindTexture(GL_TEXTURE_2D_ARRAY, atlas_);
@@ -92,6 +99,11 @@ bool WorldRenderer::init(std::string* err) {
   gl::TexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   gl::TexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_REPEAT);
   gl::TexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT);
+  gl::GenTextures(1, &anim_tex_);
+  gl::BindTexture(GL_TEXTURE_2D, anim_tex_);
+  gl::TexImage2D(GL_TEXTURE_2D, 0, GL_RG32F, models_.capacity(), 1, 0, GL_RG, GL_FLOAT, nullptr);
+  gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+  gl::TexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
   upload_atlas();
   ensure_index_buffer(8192);
   return true;
@@ -110,6 +122,10 @@ void WorldRenderer::upload_atlas() {
                     GL_RGBA, GL_UNSIGNED_BYTE, px.data());
   gl::GenerateMipmap(GL_TEXTURE_2D_ARRAY);
   uploaded_layers_ = n;
+  std::vector<float> anim;
+  models_.copy_anim(anim);
+  gl::BindTexture(GL_TEXTURE_2D, anim_tex_);
+  gl::TexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, static_cast<GLsizei>(anim.size() / 2), 1, GL_RG, GL_FLOAT, anim.data());
 }
 
 void WorldRenderer::ensure_index_buffer(size_t quads) {
@@ -293,6 +309,10 @@ void WorldRenderer::draw_pass(const Camera& cam, const SkyState& sky, bool trans
   gl::Uniform1f(u_sky_, sky.sky_light);
   gl::Uniform1f(u_cut_, translucent ? 0.02f : 0.12f);
   gl::Uniform1i(u_tex_, 0);
+  gl::Uniform1i(u_anim_, 1);
+  gl::Uniform1f(u_tick_, sky.anim_tick);
+  gl::ActiveTexture(GL_TEXTURE1);
+  gl::BindTexture(GL_TEXTURE_2D, anim_tex_);
   gl::ActiveTexture(GL_TEXTURE0);
   gl::BindTexture(GL_TEXTURE_2D_ARRAY, atlas_);
 

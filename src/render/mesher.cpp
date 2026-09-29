@@ -121,12 +121,26 @@ void mesh_section(const MeshInput& in, const BlockModels& models, MeshData& out)
           std::vector<Vertex>& dst = lava ? out.opaque : out.translucent;
           const u32 tint = lava ? 0xFFFFFF : models.tint_color(Tint::Water, biome);
           const float tr = ((tint >> 16) & 255) / 255.0f, tg = ((tint >> 8) & 255) / 255.0f, tb = (tint & 255) / 255.0f;
-          const bool above_same = blk_at(x, y + 1, z) == id;
-          const float top = above_same ? 1.0f : 0.875f;
+          auto same_fluid = [&](BlockId other) { return other != 0 && reg.info(other).def == bi.def; };
+          // Surface height: sources sit just below the block top, flowing levels step down, falling is full.
+          auto level_height = [&](BlockId fid) {
+            const BlockInfo& fi = reg.info(fid);
+            return fi.fluid_depth >= 8 ? 1.0f : 0.889f - 0.111f * static_cast<float>(fi.fluid_depth);
+          };
+          const bool above_same = same_fluid(blk_at(x, y + 1, z));
+          const float top = above_same ? 1.0f : level_height(id);
           for (int d = 0; d < 6; d++) {
             const int nx = x + kDir[d][0], ny = y + kDir[d][1], nz = z + kDir[d][2];
             const BlockId nid = blk_at(nx, ny, nz);
-            if (nid == id || opq_at(nx, ny, nz)) continue;
+            if (opq_at(nx, ny, nz)) continue;
+            float bottom = 0.0f, ytop = top;
+            if (same_fluid(nid)) {
+              if (d == UP || d == DOWN) continue;
+              // Side faces only show the part rising above the neighbouring fluid.
+              float nh = same_fluid(blk_at(nx, ny + 1, nz)) ? 1.0f : level_height(nid);
+              if (nh >= top) continue;
+              bottom = nh;
+            }
             float sk, bk;
             light_of(nx, ny, nz, sk, bk);
             const float shade = lava ? 1.0f : kDirShade[d];
@@ -137,25 +151,21 @@ void mesh_section(const MeshInput& in, const BlockModels& models, MeshData& out)
             v.blk = lava ? 255 : to_u8(bk / 15.0f);
             v.layer = layer;
             float p[4][3];
-            float t[4][2];
-            const float y0 = static_cast<float>(y), y1 = y + (d == UP ? top : top);
             const float x0 = static_cast<float>(x), x1 = x0 + 1, z0 = static_cast<float>(z), z1 = z0 + 1;
-            const float ytop = y + top;
-            (void)y1;
+            const float yb = y + bottom, yt = y + ytop;
             switch (d) {
-              case DOWN: { float q[4][3] = {{x0, y0, z1}, {x0, y0, z0}, {x1, y0, z0}, {x1, y0, z1}}; std::memcpy(p, q, sizeof p); break; }
-              case UP: { float q[4][3] = {{x0, ytop, z0}, {x0, ytop, z1}, {x1, ytop, z1}, {x1, ytop, z0}}; std::memcpy(p, q, sizeof p); break; }
-              case NORTH: { float q[4][3] = {{x1, ytop, z0}, {x1, y0, z0}, {x0, y0, z0}, {x0, ytop, z0}}; std::memcpy(p, q, sizeof p); break; }
-              case SOUTH: { float q[4][3] = {{x0, ytop, z1}, {x0, y0, z1}, {x1, y0, z1}, {x1, ytop, z1}}; std::memcpy(p, q, sizeof p); break; }
-              case WEST: { float q[4][3] = {{x0, ytop, z0}, {x0, y0, z0}, {x0, y0, z1}, {x0, ytop, z1}}; std::memcpy(p, q, sizeof p); break; }
-              default: { float q[4][3] = {{x1, ytop, z1}, {x1, y0, z1}, {x1, y0, z0}, {x1, ytop, z0}}; std::memcpy(p, q, sizeof p); break; }
+              case DOWN: { float q[4][3] = {{x0, y + 0.0f, z1}, {x0, y + 0.0f, z0}, {x1, y + 0.0f, z0}, {x1, y + 0.0f, z1}}; std::memcpy(p, q, sizeof p); break; }
+              case UP: { float q[4][3] = {{x0, yt, z0}, {x0, yt, z1}, {x1, yt, z1}, {x1, yt, z0}}; std::memcpy(p, q, sizeof p); break; }
+              case NORTH: { float q[4][3] = {{x1, yt, z0}, {x1, yb, z0}, {x0, yb, z0}, {x0, yt, z0}}; std::memcpy(p, q, sizeof p); break; }
+              case SOUTH: { float q[4][3] = {{x0, yt, z1}, {x0, yb, z1}, {x1, yb, z1}, {x1, yt, z1}}; std::memcpy(p, q, sizeof p); break; }
+              case WEST: { float q[4][3] = {{x0, yt, z0}, {x0, yb, z0}, {x0, yb, z1}, {x0, yt, z1}}; std::memcpy(p, q, sizeof p); break; }
+              default: { float q[4][3] = {{x1, yt, z1}, {x1, yb, z1}, {x1, yb, z0}, {x1, yt, z0}}; std::memcpy(p, q, sizeof p); break; }
             }
-            const float vt = (d >= NORTH) ? (1.0f - top) : 0.0f;
-            const float uvs[4][2] = {{0, vt}, {0, 1}, {1, 1}, {1, vt}};
-            std::memcpy(t, uvs, sizeof t);
+            const float vt = (d >= NORTH) ? (1.0f - ytop) : 0.0f, vb = (d >= NORTH) ? (1.0f - bottom) : 1.0f;
+            const float uvs[4][2] = {{0, vt}, {0, vb}, {1, vb}, {1, vt}};
             for (int k = 0; k < 4; k++) {
               v.x = p[k][0]; v.y = p[k][1]; v.z = p[k][2];
-              v.u = t[k][0]; v.v = t[k][1];
+              v.u = uvs[k][0]; v.v = uvs[k][1];
               dst.push_back(v);
             }
           }

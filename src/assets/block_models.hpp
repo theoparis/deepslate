@@ -49,6 +49,9 @@ class BlockModels {
   int capacity() const { return capacity_; }
   // Copies layers [from, count) into `out` and returns the new count (thread-safe).
   size_t copy_layers(size_t from, std::vector<u8>& out) const;
+  // Animation table, 2 floats per layer: (frame count, ticks per frame). Static textures are (1, 1).
+  // Animated textures occupy consecutive layers starting at their base layer.
+  size_t copy_anim(std::vector<float>& out) const;
 
   // ---- tints
   u32 tint_color(Tint kind, u8 biome) const { return tints_[static_cast<int>(kind)][biome]; }
@@ -69,7 +72,8 @@ class BlockModels {
   void bake_model(const ModelRef& ref, int block_tint_hint, BakedBlock& out);
   u16 add_layer_locked(const std::string& name);
   void init_tints();
-  Image load_tile(const std::string& texture, bool* found);
+  struct Frames { std::vector<Image> images; int frametime = 1; };
+  Frames load_frames(const std::string& texture, bool* found);
 
   const PackStack& packs_;
   mutable std::mutex m_;
@@ -79,6 +83,7 @@ class BlockModels {
   int tile_ = 16;
   int capacity_ = 1024;
   std::vector<u8> pixels_;           // layer-major, tile*tile*4 bytes each
+  std::vector<float> anim_;          // (frames, frametime) per layer
   std::atomic<size_t> layers_{0};
   std::unordered_map<std::string, u16> layer_ids_;
   u16 water_layer_ = 0, lava_layer_ = 0;

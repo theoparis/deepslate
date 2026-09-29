@@ -8,6 +8,7 @@
 #include "assets/block_models.hpp"
 #include "assets/image.hpp"
 #include "assets/resource_pack.hpp"
+#include "game/block_updates.hpp"
 #include "game/player.hpp"
 #include "game/raycast.hpp"
 #include "render/mesher.hpp"
@@ -587,4 +588,113 @@ TEST(png_roundtrip) {
   if (back) { CHECK_EQ(back->w, 7); CHECK_EQ(back->h, 5); CHECK(back->rgba == img.rgba); }
   std::vector<u8> junk = {1, 2, 3};
   CHECK(!decode_png(junk).has_value());
+}
+
+// ---------------------------------------------------------------- block updates
+
+static int fluid_depth_at(World& w, int x, int y, int z, const char* name) {
+  BlockId id = w.get_block(x, y, z);
+  const BlockInfo& bi = Blocks::get().info(id);
+  return bi.name == name ? bi.fluid_depth : -1;
+}
+static int count_blocks(World& w, BlockId lo, BlockId hi) {
+  int n = 0;
+  for (int x = -20; x <= 20; x++)
+    for (int z = -20; z <= 20; z++)
+      for (int y = 190; y <= 215; y++) {
+        BlockId b = w.get_block(x, y, z);
+        if (b >= lo && b <= hi) n++;
+      }
+  return n;
+}
+
+TEST(fluid_spreads_and_drains) {
+  TestWorld tw("fluid");
+  CHECK(tw.load_around(0, 0, 2));
+  flat_floor(tw, 200, B::stone);
+  BlockUpdates up(*tw.world);
+  tw.world->set_block(0, 201, 0, B::water);
+  up.notify(0, 201, 0);
+  for (int i = 0; i < 300; i++) up.tick();
+  // Level n at Manhattan distance n on flat ground, out to 7.
+  CHECK_EQ(fluid_depth_at(*tw.world, 1, 201, 0, "minecraft:water"), 1);
+  CHECK_EQ(fluid_depth_at(*tw.world, 3, 201, 0, "minecraft:water"), 3);
+  CHECK_EQ(fluid_depth_at(*tw.world, 0, 201, -7, "minecraft:water"), 7);
+  CHECK_EQ(fluid_depth_at(*tw.world, 8, 201, 0, "minecraft:water"), -1);
+  CHECK_EQ(fluid_depth_at(*tw.world, 4, 201, 4, "minecraft:water"), -1);  // Manhattan 8 is out of reach
+  CHECK_EQ(fluid_depth_at(*tw.world, 3, 201, 3, "minecraft:water"), 6);
+  CHECK_EQ(fluid_depth_at(*tw.world, 0, 202, 0, "minecraft:water"), -1);
+  CHECK(up.pending() == 0);  // the simulation settles
+  // Removing the source drains everything it fed.
+  tw.world->set_block(0, 201, 0, 0);
+  up.notify(0, 201, 0);
+  for (int i = 0; i < 300; i++) up.tick();
+  CHECK_EQ(count_blocks(*tw.world, B::water, B::water + 8), 0);
+}
+
+TEST(fluid_falls_and_lands) {
+  TestWorld tw("waterfall");
+  CHECK(tw.load_around(0, 0, 2));
+  flat_floor(tw, 200, B::stone);
+  for (int x = -20; x <= 20; x++) for (int z = -20; z <= 20; z++) tw.world->set_block(x, 196, z, B::stone);
+  tw.world->set_block(10, 200, 0, 0);  // a hole in the upper floor
+  BlockUpdates up(*tw.world);
+  tw.world->set_block(10, 201, 0, B::water);
+  up.notify(10, 201, 0);
+  for (int i = 0; i < 400; i++) up.tick();
+  CHECK_EQ(fluid_depth_at(*tw.world, 10, 200, 0, "minecraft:water"), 8);  // falling column
+  CHECK_EQ(fluid_depth_at(*tw.world, 10, 199, 0, "minecraft:water"), 8);
+  CHECK_EQ(fluid_depth_at(*tw.world, 10, 197, 0, "minecraft:water"), 8);
+  CHECK_EQ(fluid_depth_at(*tw.world, 11, 197, 0, "minecraft:water"), 1);  // spreads once it lands
+  CHECK_EQ(fluid_depth_at(*tw.world, 14, 197, 0, "minecraft:water"), 4);
+  tw.world->set_block(10, 201, 0, 0);
+  up.notify(10, 201, 0);
+  for (int i = 0; i < 400; i++) up.tick();
+  CHECK_EQ(count_blocks(*tw.world, B::water, B::water + 8), 0);
+}
+
+TEST(lava_flows_slower_and_shorter) {
+  TestWorld tw("lava");
+  CHECK(tw.load_around(0, 0, 2));
+  flat_floor(tw, 200, B::stone);
+  BlockUpdates up(*tw.world);
+  tw.world->set_block(0, 201, 0, B::lava);
+  up.notify(0, 201, 0);
+  for (int i = 0; i < 20; i++) up.tick();  // 1s: water would have spread several blocks, lava has barely started
+  CHECK_EQ(fluid_depth_at(*tw.world, 3, 201, 0, "minecraft:lava"), -1);
+  for (int i = 0; i < 400; i++) up.tick();
+  CHECK_EQ(fluid_depth_at(*tw.world, 3, 201, 0, "minecraft:lava"), 3);
+  CHECK_EQ(fluid_depth_at(*tw.world, 4, 201, 0, "minecraft:lava"), -1);  // lava reaches only 3 blocks
+}
+
+TEST(gravity_blocks_fall) {
+  TestWorld tw("gravity");
+  CHECK(tw.load_around(0, 0, 2));
+  flat_floor(tw, 200, B::stone);
+  BlockUpdates up(*tw.world);
+  tw.world->set_block(0, 206, 0, B::sand);
+  tw.world->set_block(1, 204, 0, B::gravel);
+  up.notify(0, 206, 0);
+  up.notify(1, 204, 0);
+  for (int i = 0; i < 100; i++) up.tick();
+  CHECK_EQ(tw.world->get_block(0, 201, 0), B::sand);
+  CHECK_EQ(tw.world->get_block(0, 206, 0), BlockId(0));
+  CHECK_EQ(tw.world->get_block(1, 201, 0), B::gravel);
+  // Removing the support drops a whole column, one block after another.
+  tw.world->set_block(5, 196, 5, B::stone);  // catch floor below the column
+  tw.world->set_block(5, 201, 5, B::sand);
+  tw.world->set_block(5, 202, 5, B::sand);
+  tw.world->set_block(5, 203, 5, B::sand);
+  tw.world->set_block(5, 200, 5, 0);
+  up.notify(5, 200, 5);
+  up.notify(5, 201, 5);
+  for (int i = 0; i < 300; i++) up.tick();
+  CHECK_EQ(tw.world->get_block(5, 200, 5), BlockId(0));
+  int sand = 0;
+  for (int y = 100; y < 204; y++) if (tw.world->get_block(5, y, 5) == B::sand) sand++;
+  CHECK_EQ(sand, 3);
+  CHECK_EQ(tw.world->get_block(5, 197, 5), B::sand);
+  CHECK_EQ(tw.world->get_block(5, 199, 5), B::sand);
+  // Sand on solid ground stays put.
+  CHECK_EQ(tw.world->get_block(0, 201, 0), B::sand);
 }

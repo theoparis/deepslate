@@ -140,48 +140,80 @@ BlockModels::BlockModels(const PackStack& packs) : packs_(packs) {
     }
   pixels_.insert(pixels_.end(), missing.begin(), missing.end());
   layers_.store(1);
+  anim_.assign(2, 1.0f);
   layer_ids_["<missing>"] = 0;
   init_tints();
 }
 
-Image BlockModels::load_tile(const std::string& texture, bool* found) {
+BlockModels::Frames BlockModels::load_frames(const std::string& texture, bool* found) {
   *found = false;
+  Frames out;
   auto data = packs_.read("assets/minecraft/textures/" + texture + ".png");
-  if (!data) return {};
+  if (!data) return out;
   auto img = decode_png(*data);
-  if (!img || img->empty()) return {};
+  if (!img || img->empty()) return out;
   *found = true;
-  Image tile = *img;
-  // Animated textures are vertical strips of square frames: keep the first frame.
-  if (tile.h > tile.w && tile.w > 0) {
-    tile.h = tile.w;
-    tile.rgba.resize(static_cast<size_t>(tile.w) * tile.h * 4);
+  // Animated textures are vertical strips of square frames plus an optional .mcmeta.
+  const int fw = img->w;
+  int nframes = (img->h > img->w && img->w > 0) ? img->h / img->w : 1;
+  std::vector<int> seq;
+  if (nframes > 1) {
+    if (auto meta = packs_.read("assets/minecraft/textures/" + texture + ".png.mcmeta")) {
+      try {
+        simdjson::dom::parser parser;
+        simdjson::padded_string ps(reinterpret_cast<const char*>(meta->data()), meta->size());
+        simdjson::dom::element doc;
+        if (!parser.parse(ps).get(doc)) {
+          int64_t ft;
+          if (!doc["animation"]["frametime"].get(ft)) out.frametime = static_cast<int>(std::max<int64_t>(1, ft));
+          simdjson::dom::array frames;
+          if (!doc["animation"]["frames"].get(frames)) {
+            for (simdjson::dom::element f : frames) {
+              int64_t idx, t;
+              if (!f.get(idx)) seq.push_back(static_cast<int>(idx));
+              else if (!f["index"].get(idx)) {
+                int reps = 1;
+                if (!f["time"].get(t)) reps = static_cast<int>(std::max<int64_t>(1, t / out.frametime));
+                for (int r = 0; r < reps && r < 16; r++) seq.push_back(static_cast<int>(idx));
+              }
+            }
+          }
+        }
+      } catch (const simdjson::simdjson_error&) {}
+    }
+    if (seq.empty()) for (int i = 0; i < nframes; i++) seq.push_back(i);
+    for (int& i : seq) i = clampv(i, 0, nframes - 1);
+    if (seq.size() > 64) seq.resize(64);
+  } else {
+    seq.push_back(0);
   }
-  if (tile.w != tile_ || tile.h != tile_) {
-    Image scaled = Image::make(tile_, tile_);
+  for (int fi : seq) {
+    Image tile = Image::make(tile_, tile_);
     for (int y = 0; y < tile_; y++)
-      for (int x = 0; x < tile_; x++) {
-        const u8* s = tile.px(x * tile.w / tile_, y * tile.h / tile_);
-        std::memcpy(scaled.px(x, y), s, 4);
-      }
-    tile = std::move(scaled);
+      for (int x = 0; x < tile_; x++)
+        std::memcpy(tile.px(x, y), img->px(x * fw / tile_, fi * fw + y * fw / tile_), 4);
+    out.images.push_back(std::move(tile));
   }
-  return tile;
+  return out;
 }
 
 u16 BlockModels::add_layer_locked(const std::string& name) {
   std::string n = strip_ns(name);
   if (auto it = layer_ids_.find(n); it != layer_ids_.end()) return it->second;
   bool found = false;
-  Image tile = load_tile(n, &found);
+  Frames fr = load_frames(n, &found);
   size_t idx = layers_.load();
-  if (!found || static_cast<int>(idx) >= capacity_) {
+  const size_t need = fr.images.size();
+  if (!found || static_cast<int>(idx + need) > capacity_) {
     if (!found) log_debug("missing texture: {}", n);
     layer_ids_[n] = 0;
     return 0;
   }
-  pixels_.insert(pixels_.end(), tile.rgba.begin(), tile.rgba.end());
-  layers_.store(idx + 1, std::memory_order_release);
+  for (auto& img : fr.images) pixels_.insert(pixels_.end(), img.rgba.begin(), img.rgba.end());
+  anim_.resize((idx + need) * 2, 1.0f);
+  anim_[idx * 2] = static_cast<float>(need);
+  anim_[idx * 2 + 1] = static_cast<float>(fr.frametime);
+  layers_.store(idx + need, std::memory_order_release);
   layer_ids_[n] = static_cast<u16>(idx);
   return static_cast<u16>(idx);
 }
@@ -192,6 +224,13 @@ u16 BlockModels::layer_of(const std::string& texture) {
 }
 
 size_t BlockModels::layer_count() const { return layers_.load(std::memory_order_acquire); }
+
+size_t BlockModels::copy_anim(std::vector<float>& out) const {
+  std::lock_guard lk(m_);
+  out = anim_;
+  out.resize(layers_.load() * 2, 1.0f);
+  return out.size() / 2;
+}
 
 size_t BlockModels::copy_layers(size_t from, std::vector<u8>& out) const {
   std::lock_guard lk(m_);
