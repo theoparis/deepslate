@@ -456,6 +456,12 @@ class BuiltinPack : public PackSource {
   }
   bool has(const std::string& path) const override { return gen_.contains(path); }
   std::string name() const override { return "builtin"; }
+  std::vector<std::string> list(const std::string& prefix) const override {
+    std::vector<std::string> v;
+    for (auto& [k, _] : gen_)
+      if (k.starts_with(prefix)) v.push_back(k);
+    return v;
+  }
   std::vector<std::string> files() const {
     std::vector<std::string> v;
     for (auto& [k, _] : gen_) v.push_back(k);

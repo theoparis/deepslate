@@ -17,6 +17,8 @@ class PackSource {
   virtual std::optional<std::vector<u8>> read(const std::string& path) const = 0;
   virtual bool has(const std::string& path) const = 0;
   virtual std::string name() const = 0;
+  // Paths starting with `prefix` (used by tools; not needed by the game).
+  virtual std::vector<std::string> list(const std::string& prefix) const = 0;
 };
 
 class PackStack {
@@ -28,6 +30,7 @@ class PackStack {
 
   std::optional<std::vector<u8>> read(const std::string& path) const;
   bool has(const std::string& path) const;
+  std::vector<std::string> list(const std::string& prefix) const;  // union over all layers, sorted
   std::string describe() const;
   size_t layer_count() const { return layers_.size(); }
 

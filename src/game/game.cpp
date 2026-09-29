@@ -868,7 +868,8 @@ void Game::draw_inventory() {
     ui.rect(x + 1, y + 1, 16, 16, 0xFF8B8B8B);
     if (hotbar_[static_cast<size_t>(i)]) ui.block_icon(hotbar_[static_cast<size_t>(i)], x + 1, y + 1, 16);
   }
-  ui.text("Click: set slot   RMB hotbar: clear", px + 8, py + 129, 0xFF404040, false);
+  ui.text("Click: set selected slot", px + 8, py + 112, 0xFF404040, false);
+  ui.text("Right-click a slot: clear it", px + 8, py + 124, 0xFF404040, false);
   if (hovered) {
     std::string n = block_display(hovered);
     float tw = ui.text_width(n);

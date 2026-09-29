@@ -323,8 +323,10 @@ const BlockModels::Model* BlockModels::load_model(const std::string& raw_name, i
     if (!doc["ambientocclusion"].get(ao)) model->ao = ao;
     simdjson::dom::object tex;
     if (!doc["textures"].get(tex))
-      for (auto [k, v] : tex)
+      for (auto [k, v] : tex) {
         if (!v.get(sv)) model->textures[std::string(k)] = std::string(sv);
+        else if (!v["sprite"].get(sv)) model->textures[std::string(k)] = std::string(sv);  // 26.x: {"sprite": ..., "force_translucent": ...}
+      }
     simdjson::dom::array elems;
     if (!doc["elements"].get(elems)) {
       model->has_elements = true;

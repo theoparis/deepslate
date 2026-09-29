@@ -34,3 +34,6 @@ target_link_libraries(worldmap PRIVATE deepslate_core)
 
 add_executable(bench ../tools/bench.cpp)
 target_link_libraries(bench PRIVATE deepslate_core)
+
+add_executable(packcheck ../tools/packcheck.cpp)
+target_link_libraries(packcheck PRIVATE deepslate_core)

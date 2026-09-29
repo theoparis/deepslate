@@ -100,6 +100,13 @@ Bedrock block states are translated to Java properties (`pillar_axis` -> `axis`,
 scaled to it. Missing files fall through to the built-in pack, and a missing model shows the classic
 magenta/black checkerboard.
 
+Compatibility with the current official layout is checked against the **26.3 client jar** (a jar is just a
+zip, so `--resource-pack client.jar` works): 1,131 of its 1,288 blockstates bake with every texture resolved
+(the rest are entity-rendered blocks such as chests/banners, fluids, or multipart blocks that need block
+properties). Format details handled include 26.x texture entries of the form
+`{"sprite": "...", "force_translucent": true}`. Run `build/release/src/packcheck <pack>` to get this report for
+any pack (`--verbose` lists the failures).
+
 `deepslate --write-builtin-pack builtin.zip` writes the built-in pack in the same layout, which is a handy
 starting point for your own pack.
 

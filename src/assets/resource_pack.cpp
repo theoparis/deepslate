@@ -35,6 +35,12 @@ class ZipPack : public PackSource {
   }
   bool has(const std::string& path) const override { return files.contains(path); }
   std::string name() const override { return label; }
+  std::vector<std::string> list(const std::string& prefix) const override {
+    std::vector<std::string> v;
+    for (auto& [k, _] : files)
+      if (k.starts_with(prefix)) v.push_back(k);
+    return v;
+  }
 };
 
 class DirPack : public PackSource {
@@ -50,6 +56,16 @@ class DirPack : public PackSource {
     return fs::is_regular_file(root / path, ec);
   }
   std::string name() const override { return root.string(); }
+  std::vector<std::string> list(const std::string& prefix) const override {
+    std::vector<std::string> v;
+    std::error_code ec;
+    for (auto it = fs::recursive_directory_iterator(root, ec); !ec && it != fs::recursive_directory_iterator(); it.increment(ec)) {
+      if (!it->is_regular_file()) continue;
+      std::string rel = fs::relative(it->path(), root).generic_string();
+      if (rel.starts_with(prefix)) v.push_back(rel);
+    }
+    return v;
+  }
 };
 
 size_t curl_write(char* p, size_t sz, size_t n, void* ud) {
@@ -178,6 +194,17 @@ bool PackStack::has(const std::string& path) const {
   for (auto& l : layers_)
     if (l->has(path)) return true;
   return false;
+}
+
+std::vector<std::string> PackStack::list(const std::string& prefix) const {
+  std::vector<std::string> v;
+  for (auto& l : layers_) {
+    auto part = l->list(prefix);
+    v.insert(v.end(), part.begin(), part.end());
+  }
+  std::sort(v.begin(), v.end());
+  v.erase(std::unique(v.begin(), v.end()), v.end());
+  return v;
 }
 
 std::string PackStack::describe() const {
