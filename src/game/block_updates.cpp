@@ -129,6 +129,19 @@ void BlockUpdates::fluid(int x, int y, int z, BlockId id) {
     return same(b) && i.fluid_depth < 8;
   };
 
+  // Water meeting lava turns a lava source into obsidian and flowing lava into cobblestone;
+  // lava flowing onto water hardens to stone.
+  auto react = [&](int tx, int ty, int tz) {
+    BlockId t = world_.get_block(tx, ty, tz);
+    if (!t) return false;
+    const BlockInfo& ti = reg.info(t);
+    if (!is_fluid(ti) || ti.def == me.def) return false;
+    BlockId result = lava ? B::stone : (ti.fluid_depth == 0 ? B::obsidian : B::cobblestone);
+    world_.set_block(tx, ty, tz, result);
+    notify(tx, ty, tz);
+    return true;
+  };
+
   // 1. Flowing fluid needs a feeder, otherwise it drains away.
   if (depth > 0) {
     int best = 99;
@@ -159,6 +172,7 @@ void BlockUpdates::fluid(int x, int y, int z, BlockId id) {
   }
 
   // 2. Flow down first.
+  if (y > MIN_Y && react(x, y - 1, z)) return;
   if (y > MIN_Y && !rests(x, y - 1, z)) {
     BlockId below = world_.get_block(x, y - 1, z);
     const BlockInfo& bel = reg.info(below);
@@ -175,6 +189,7 @@ void BlockUpdates::fluid(int x, int y, int z, BlockId id) {
   if (nd > max_flow) return;
   for (auto& s : kSide) {
     int nx = x + s[0], nz = z + s[1];
+    if (react(nx, y, nz)) continue;
     BlockId nb = world_.get_block(nx, y, nz);
     const BlockInfo& ni = reg.info(nb);
     bool place = false;

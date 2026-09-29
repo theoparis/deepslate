@@ -849,3 +849,25 @@ TEST(wall_torch_model_and_shape) {
   CHECK_EQ(reg.info(east).emit, u8(14));
   CHECK(!reg.info(east).solid());
 }
+
+TEST(water_and_lava_react) {
+  TestWorld tw("react");
+  CHECK(tw.load_around(0, 0, 2));
+  flat_floor(tw, 200, B::stone);
+  BlockUpdates up(*tw.world);
+  // Water reaching a lava source makes obsidian; flowing lava becomes cobblestone.
+  tw.world->set_block(0, 201, 0, B::lava);
+  tw.world->set_block(4, 201, 0, B::water);
+  up.notify(0, 201, 0);
+  up.notify(4, 201, 0);
+  for (int i = 0; i < 400; i++) up.tick();
+  bool obsidian = false, cobble = false;
+  for (int x = -6; x <= 6; x++)
+    for (int z = -6; z <= 6; z++) {
+      BlockId b = tw.world->get_block(x, 201, z);
+      if (b == B::obsidian) obsidian = true;
+      if (b == B::cobblestone) cobble = true;
+    }
+  CHECK(obsidian || cobble);
+  CHECK(tw.world->get_block(0, 201, 0) != B::lava || cobble);  // the source was not left untouched next to water
+}

@@ -13,9 +13,10 @@ Without `--resource-pack` a procedurally generated built-in pack is used, so the
 
 ## Features
 
-* **Infinite procedural world** (FastNoise2): continents and oceans, plains, forests, birch forests, taiga,
-  snowy plains, deserts, savanna, hills and mountains with snow caps, beaches, tunnels and caverns, deepslate
-  layer and bedrock floor, ore veins, trees, flowers, grass, cacti and sugar cane. World height -64 .. 319.
+* **Infinite procedural world** (FastNoise2): continents and oceans, plains, forests, birch and dark forests,
+  jungle, taiga, snowy plains, deserts, acacia savanna, hills and mountains with snow caps, beaches, tunnels
+  and caverns, deepslate layer and bedrock floor, ore veins, oak/birch/spruce/acacia/jungle/dark-oak trees,
+  flowers, grass, cacti and sugar cane. World height -64 .. 319. About 1 ms per chunk per thread.
 * **Bedrock world format** (minimal but real):
   * `level.dat`: 8-byte header (storage version, length) + little-endian NBT.
   * `db/`: LevelDB with **raw-deflate block compression** (Mojang's fork).
@@ -37,8 +38,9 @@ Without `--resource-pack` a procedurally generated built-in pack is used, so the
   occlusion, smooth flood-filled **sky light and block light**, translucent water with flowing depths, lava,
   day/night cycle with sun, moon and stars, fog, frustum culling, biome-tinted grass/leaves/water.
 * **Gameplay:** walking/sprinting/sneaking/swimming/flying physics with step-up, breaking and placing
-  (slab halves, stair facing, log axes), block picking, hotbar, creative inventory, sand/gravel gravity,
-  water/lava flow, autosave.
+  (slab halves, stair facing, log axes, wall torches), block picking, hotbar, creative inventory,
+  sand/gravel gravity, water/lava flow (levels, waterfalls, obsidian/cobblestone when they meet), plants and
+  torches that break when unsupported, break particles, clouds, autosave.
 
 ## Building
 
@@ -111,7 +113,7 @@ src/assets    resource packs (zip/dir/url), built-in pack, blockstate/model baki
 src/render    GL loader, camera, mesher, world renderer, UI, sky
 src/game      player physics, ray casting, block updates (gravity, fluids), game loop
 tests         unit tests + end-to-end smoke test (needs xvfb-run)
-tools         worldmap (top-down generator preview), fallback font generator
+tools         worldmap (top-down terrain/biome preview), bench (generation/meshing throughput), fallback font generator
 ```
 
 Threading model in one paragraph: `World::update` (main thread) submits *load-or-generate* jobs nearest-first;
@@ -122,6 +124,9 @@ fill, culling, AO, quads) and push vertex data back for a time-boxed upload. Edi
 sub-chunk, so in-flight jobs keep a consistent view.
 
 ## Testing
+
+Scripted runs are also how visual changes are checked: `--script "idle;setblock 0 100 0 stone;wait 2;shot a.png;quit"`
+(see `--help` for the action list) drives the real game headlessly, e.g. under `xvfb-run`.
 
 `deepslate_tests` covers the NBT and Bedrock codecs (including bit-packing layout and legacy sub-chunk
 versions), storage round trips, world generation determinism and thread safety, pack loading (zip, directory,

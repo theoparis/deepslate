@@ -1,7 +1,8 @@
 // Renders a top-down biome/height map of the generator output.
-//   worldmap <seed> <center_x> <center_z> <size_in_blocks> <out.png> [step]
+//   worldmap <seed> <center_x> <center_z> <size_in_blocks> <out.png> [step] [biomes]
 #include <cstdlib>
 #include <iostream>
+#include <string>
 
 #include "assets/image.hpp"
 #include "world/worldgen.hpp"
@@ -13,6 +14,7 @@ int main(int argc, char** argv) {
   i64 seed = std::atoll(argv[1]);
   int cx = std::atoi(argv[2]), cz = std::atoi(argv[3]), size = std::atoi(argv[4]);
   int step = argc > 6 ? std::atoi(argv[6]) : 4;
+  const bool biome_mode = argc > 7 && std::string(argv[7]) == "biomes";
   (void)Blocks::get();
   WorldGen gen(seed);
   int n = size / step;
@@ -35,6 +37,16 @@ int main(int argc, char** argv) {
       float shade = 0.7f + 0.3f * clampv((h - 40) / 120.0f, 0.0f, 1.0f);
       if (Blocks::get().info(top).flags & BF_Liquid) shade = 0.55f + 0.45f * clampv((h + 20) / 80.0f, 0.0f, 1.0f);
       u8* p = img.px(i, j);
+      if (biome_mode) {
+        static const std::pair<u8, u32> pal[] = {{Biome::Ocean, 0x2050B0}, {Biome::DeepOcean, 0x102060}, {Biome::FrozenOcean, 0x7080C0}, {Biome::Plains, 0x8DB360},
+            {Biome::Forest, 0x056621}, {Biome::BirchForest, 0x307444}, {Biome::DarkForest, 0x40511A}, {Biome::Taiga, 0x0B6659},
+            {Biome::ColdTaiga, 0x31554A}, {Biome::SnowyPlains, 0xFFFFFF}, {Biome::Desert, 0xFA9418}, {Biome::Savanna, 0xBDB25F},
+            {Biome::Jungle, 0x537B09}, {Biome::Hills, 0x606060}, {Biome::Beach, 0xFADE55}, {Biome::Swamp, 0x07F9B2}};
+        u32 bc = 0xFF00FF;
+        for (auto& [id, c2] : pal) if (id == c->biome[col_index(lx, lz)]) bc = c2;
+        p[0] = static_cast<u8>((bc >> 16) & 255); p[1] = static_cast<u8>((bc >> 8) & 255); p[2] = static_cast<u8>(bc & 255); p[3] = 255;
+        continue;
+      }
       p[0] = static_cast<u8>(((col >> 16) & 255) * shade);
       p[1] = static_cast<u8>(((col >> 8) & 255) * shade);
       p[2] = static_cast<u8>((col & 255) * shade);

@@ -121,7 +121,7 @@ class Chunk {
 namespace Biome {
 enum : u8 {
   Ocean = 0, Plains = 1, Desert = 2, Hills = 3, Forest = 4, Taiga = 5, Swamp = 6, FrozenOcean = 10, SnowyPlains = 12, Beach = 16,
-  DeepOcean = 24, BirchForest = 27, ColdTaiga = 30, Savanna = 35,
+  Jungle = 21, DeepOcean = 24, BirchForest = 27, DarkForest = 29, ColdTaiga = 30, Savanna = 35,
 };
 struct Climate { float temperature, downfall; };
 Climate climate(u8 biome);

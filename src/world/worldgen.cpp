@@ -80,27 +80,29 @@ void WorldGen::compute_columns(ChunkPos pos, ColumnGrid& out) const {
       h = clampv(h, 8.0f, 300.0f);
       Column& col = out[i];
       col.height = static_cast<int>(h);
-      col.temp = temp[i];
-      col.hum = hum[i];
+      col.temp = temp[i] * 0.72f + 0.1f;
+      col.hum = hum[i] * 0.85f;
       // Cool down with altitude.
       float t = col.temp - std::max(0.0f, h - 100.0f) * 0.012f;
       u8 b;
       if (col.height < SEA_LEVEL - 1) {
         b = col.height < 38 ? Biome::DeepOcean : Biome::Ocean;
-        if (t < -0.45f) b = Biome::FrozenOcean;
+        if (t < -0.4f) b = Biome::FrozenOcean;
       } else if (col.height <= SEA_LEVEL + 1 && c < 0.1f) {
         b = Biome::Beach;
       } else if (h > 120.0f) {
         b = Biome::Hills;
-      } else if (t < -0.45f) {
+      } else if (t < -0.4f) {
         b = col.hum > 0.0f ? Biome::ColdTaiga : Biome::SnowyPlains;
-      } else if (t < -0.1f) {
+      } else if (t < -0.12f) {
         b = Biome::Taiga;
-      } else if (t > 0.5f) {
-        b = col.hum < -0.05f ? Biome::Desert : (col.hum < 0.25f ? Biome::Savanna : Biome::Plains);
-      } else if (col.hum > 0.3f) {
-        b = t < 0.15f ? Biome::BirchForest : Biome::Forest;
-      } else if (col.hum > 0.05f) {
+      } else if (t > 0.38f) {
+        b = col.hum < -0.1f ? Biome::Desert : (col.hum < 0.2f ? Biome::Savanna : (col.hum > 0.4f ? Biome::Jungle : Biome::Plains));
+      } else if (col.hum > 0.45f && t > 0.05f) {
+        b = Biome::DarkForest;
+      } else if (col.hum > 0.25f) {
+        b = t < 0.2f ? Biome::BirchForest : Biome::Forest;
+      } else if (col.hum > -0.08f) {
         b = Biome::Forest;
       } else {
         b = Biome::Plains;
@@ -266,16 +268,21 @@ void WorldGen::place_features(Chunk& c, const ColumnGrid& cols) const {
   auto ground_ok = [&](const Column& col) { return col.height >= SEA_LEVEL; };
 
   // ---- trees: candidates from the extended region so canopies cross chunk borders.
-  for (int lz = -3; lz < 16 + 3; lz++) {
-    for (int lx = -3; lx < 16 + 3; lx++) {
+  Blocks& reg = Blocks::get();
+  static const BlockId acacia_log = reg.find("acacia_log"), acacia_leaves = reg.find("acacia_leaves"), jungle_log = reg.find("jungle_log"),
+                       jungle_leaves = reg.find("jungle_leaves"), dark_log = reg.find("dark_oak_log"), dark_leaves = reg.find("dark_oak_leaves");
+  for (int lz = -PAD; lz < 16 + PAD; lz++) {
+    for (int lx = -PAD; lx < 16 + PAD; lx++) {
       const Column& col = col_at(lx, lz);
       float density = 0;
       switch (col.biome) {
         case Biome::Forest: density = 0.030f; break;
         case Biome::BirchForest: density = 0.030f; break;
         case Biome::Taiga: case Biome::ColdTaiga: density = 0.028f; break;
+        case Biome::Jungle: density = 0.055f; break;
+        case Biome::DarkForest: density = 0.05f; break;
         case Biome::Plains: density = 0.0015f; break;
-        case Biome::Savanna: density = 0.004f; break;
+        case Biome::Savanna: density = 0.006f; break;
         case Biome::SnowyPlains: density = 0.002f; break;
         case Biome::Hills: density = col.height < 110 ? 0.006f : 0.0f; break;
         default: break;
@@ -295,12 +302,24 @@ void WorldGen::place_features(Chunk& c, const ColumnGrid& cols) const {
       if (!best) continue;
 
       Rng rng(hv ^ 0x1234);
+      enum class Shape { Round, Conifer, Acacia, Jungle, DarkOak } shape = Shape::Round;
       BlockId log = B::oak_log, leaves = B::oak_leaves;
       int trunk = rng.range(4, 6);
-      enum { Round, Conifer } shape = Round;
-      if (col.biome == Biome::BirchForest || (col.biome == Biome::Forest && rng.chance(0.2f))) { log = B::birch_log; leaves = B::birch_leaves; trunk = rng.range(5, 7); }
-      if (col.biome == Biome::Taiga || col.biome == Biome::ColdTaiga || col.biome == Biome::SnowyPlains ||
-          (col.biome == Biome::Hills)) { log = B::spruce_log; leaves = B::spruce_leaves; trunk = rng.range(6, 9); shape = Conifer; }
+      switch (col.biome) {
+        case Biome::BirchForest: log = B::birch_log; leaves = B::birch_leaves; trunk = rng.range(5, 7); break;
+        case Biome::Forest:
+          if (rng.chance(0.2f)) { log = B::birch_log; leaves = B::birch_leaves; trunk = rng.range(5, 7); }
+          break;
+        case Biome::Taiga: case Biome::ColdTaiga: case Biome::SnowyPlains: case Biome::Hills:
+          log = B::spruce_log; leaves = B::spruce_leaves; trunk = rng.range(6, 9); shape = Shape::Conifer; break;
+        case Biome::Savanna: log = acacia_log; leaves = acacia_leaves; trunk = rng.range(4, 5); shape = Shape::Acacia; break;
+        case Biome::Jungle:
+          if (rng.chance(0.55f)) { log = jungle_log; leaves = jungle_leaves; trunk = rng.range(9, 15); shape = Shape::Jungle; }
+          else { log = jungle_log; leaves = jungle_leaves; trunk = rng.range(4, 6); }
+          break;
+        case Biome::DarkForest: log = dark_log; leaves = dark_leaves; trunk = rng.range(5, 7); shape = Shape::DarkOak; break;
+        default: break;
+      }
       const int base = col.height + 1;
 
       auto put = [&](int x, int y, int z, BlockId id, bool only_air) {
@@ -309,31 +328,83 @@ void WorldGen::place_features(Chunk& c, const ColumnGrid& cols) const {
         if (only_air && cur != 0 && !(Blocks::get().info(cur).flags & BF_Plant)) return;
         c.set(x, y, z, id);
       };
-      for (int y = 0; y < trunk; y++) put(lx, base + y, lz, log, false);
-      if (shape == Round) {
-        int top = base + trunk;
-        for (int dy = -2; dy <= 1; dy++) {
-          int r = dy >= 0 ? (dy == 0 ? 1 : 1) : 2;
-          for (int dx = -r; dx <= r; dx++)
-            for (int dz = -r; dz <= r; dz++) {
-              if (std::abs(dx) == r && std::abs(dz) == r && (dy >= 0 || rng.chance(0.4f))) continue;
-              if (dx == 0 && dz == 0 && dy < 0) continue;
-              put(lx + dx, top + dy, lz + dz, leaves, true);
-            }
+      // Rounded square/disc layer of leaves.
+      auto layer = [&](int cx, int cy, int cz, int r, float corner_keep) {
+        for (int dx = -r; dx <= r; dx++)
+          for (int dz = -r; dz <= r; dz++) {
+            if (std::abs(dx) == r && std::abs(dz) == r && !rng.chance(corner_keep)) continue;
+            put(cx + dx, cy, cz + dz, leaves, true);
+          }
+      };
+      switch (shape) {
+        case Shape::Round: {
+          for (int y = 0; y < trunk; y++) put(lx, base + y, lz, log, false);
+          int top = base + trunk;
+          for (int dy = -2; dy <= 1; dy++) {
+            int r = dy >= 0 ? 1 : 2;
+            for (int dx = -r; dx <= r; dx++)
+              for (int dz = -r; dz <= r; dz++) {
+                if (std::abs(dx) == r && std::abs(dz) == r && (dy >= 0 || rng.chance(0.4f))) continue;
+                if (dx == 0 && dz == 0 && dy < 0) continue;
+                put(lx + dx, top + dy, lz + dz, leaves, true);
+              }
+          }
+          put(lx, top + 1, lz, leaves, true);
+          break;
         }
-        put(lx, top + 1, lz, leaves, true);
-      } else {
-        int top = base + trunk;
-        int r = 0;
-        for (int y = top + 1; y >= base + 2; y--) {
-          for (int dx = -r; dx <= r; dx++)
-            for (int dz = -r; dz <= r; dz++) {
-              if (std::abs(dx) + std::abs(dz) > r + (r > 1 ? 1 : 0)) continue;
-              if (dx == 0 && dz == 0 && y <= top) continue;
-              put(lx + dx, y, lz + dz, leaves, true);
-            }
-          r = (r + 1) % 3 + ((top + 1 - y) > 4 ? 1 : 0);
-          if (r > 3) r = 1;
+        case Shape::Conifer: {
+          for (int y = 0; y < trunk; y++) put(lx, base + y, lz, log, false);
+          int top = base + trunk;
+          int r = 0;
+          for (int y = top + 1; y >= base + 2; y--) {
+            for (int dx = -r; dx <= r; dx++)
+              for (int dz = -r; dz <= r; dz++) {
+                if (std::abs(dx) + std::abs(dz) > r + (r > 1 ? 1 : 0)) continue;
+                if (dx == 0 && dz == 0 && y <= top) continue;
+                put(lx + dx, y, lz + dz, leaves, true);
+              }
+            r = (r + 1) % 3 + ((top + 1 - y) > 4 ? 1 : 0);
+            if (r > 3) r = 1;
+          }
+          break;
+        }
+        case Shape::Acacia: {
+          // Straight trunk that leans one block sideways and ends in a flat, wide canopy.
+          static const int dirs[4][2] = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+          const int* d = dirs[rng.range(0, 3)];
+          int y = 0;
+          for (; y < trunk - 1; y++) put(lx, base + y, lz, log, false);
+          int cx = lx, cz = lz;
+          for (int k = 0; k < 2; k++) {
+            cx += d[0]; cz += d[1];
+            put(cx, base + y, lz + (cz - lz), log, false);
+            y++;
+          }
+          int top = base + y;
+          layer(cx, top, cz, 2, 0.5f);
+          layer(cx, top + 1, cz, 1, 0.0f);
+          layer(cx, top - 1, cz, 1, 0.0f);
+          break;
+        }
+        case Shape::Jungle: {
+          for (int y = 0; y < trunk; y++) put(lx, base + y, lz, log, false);
+          int top = base + trunk;
+          layer(lx, top - 2, lz, 3, 0.4f);
+          layer(lx, top - 1, lz, 3, 0.7f);
+          layer(lx, top, lz, 2, 0.8f);
+          layer(lx, top + 1, lz, 1, 0.0f);
+          break;
+        }
+        case Shape::DarkOak: {
+          for (int y = 0; y < trunk; y++)
+            for (int dx = 0; dx < 2; dx++)
+              for (int dz = 0; dz < 2; dz++) put(lx + dx, base + y, lz + dz, log, false);
+          int top = base + trunk;
+          layer(lx, top - 2, lz, 2, 0.4f);
+          layer(lx, top - 1, lz, 3, 0.5f);
+          layer(lx, top, lz, 3, 0.7f);
+          layer(lx, top + 1, lz, 2, 0.5f);
+          break;
         }
       }
     }
@@ -362,6 +433,14 @@ void WorldGen::place_features(Chunk& c, const ColumnGrid& cols) const {
           case Biome::Taiga: case Biome::ColdTaiga:
             if (v < 0.08f) c.set(lx, h + 1, lz, B::fern);
             else if (v < 0.12f) c.set(lx, h + 1, lz, B::short_grass);
+            break;
+          case Biome::Jungle:
+            if (v < 0.22f) c.set(lx, h + 1, lz, B::short_grass);
+            else if (v < 0.34f) c.set(lx, h + 1, lz, B::fern);
+            break;
+          case Biome::DarkForest:
+            if (v < 0.06f) c.set(lx, h + 1, lz, B::short_grass);
+            else if (v < 0.075f) c.set(lx, h + 1, lz, (hv >> 20) % 2 ? B::brown_mushroom : B::red_mushroom);
             break;
           default: break;
         }

@@ -16,6 +16,8 @@ Climate climate(u8 b) {
     case BirchForest: return {0.6f, 0.6f};
     case ColdTaiga: return {-0.5f, 0.4f};
     case Savanna: return {1.2f, 0.0f};
+    case Jungle: return {0.95f, 0.9f};
+    case DarkForest: return {0.7f, 0.8f};
     default: return {0.8f, 0.4f};
   }
 }
