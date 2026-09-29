@@ -176,6 +176,7 @@ function(ds_dep_curl)
   set(CURL_DISABLE_LDAP ON CACHE BOOL "" FORCE)
   set(CURL_DISABLE_TESTS ON CACHE BOOL "" FORCE)
   set(CURL_ZSTD OFF CACHE BOOL "" FORCE)
+  set(CURL_ZLIB OFF CACHE STRING "" FORCE)  # content-encoding is not needed; keeps curl independent of our zlib-ng alias
   set(CURL_BROTLI OFF CACHE BOOL "" FORCE)
   set(CURL_USE_OPENSSL ON CACHE BOOL "" FORCE)
   set(HTTP_ONLY ON CACHE BOOL "" FORCE)

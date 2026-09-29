@@ -24,8 +24,23 @@ struct BakedQuad {
 };
 
 struct BakedBlock {
-  std::vector<BakedQuad> quads;
+  std::vector<BakedQuad> quads;  // the first (default) model
+  // Blockstates may list several weighted models; one is chosen per block position (like the
+  // real game) so repeating textures such as stone and grass do not visibly tile.
+  struct Alt { std::vector<BakedQuad> quads; int weight = 1; };
+  std::vector<Alt> alts;         // empty unless there is more than one choice
+  int total_weight = 0;
   bool missing = false;
+
+  const std::vector<BakedQuad>& pick(u64 position_hash) const {
+    if (alts.empty()) return quads;
+    int r = static_cast<int>(position_hash % static_cast<u64>(total_weight));
+    for (const Alt& a : alts) {
+      if (r < a.weight) return a.quads;
+      r -= a.weight;
+    }
+    return alts.back().quads;
+  }
 };
 
 class BlockModels {
@@ -63,7 +78,7 @@ class BlockModels {
  private:
   struct Element;
   struct Model;
-  struct ModelRef { std::string name; int x = 0, y = 0; bool uvlock = false; };
+  struct ModelRef { std::string name; int x = 0, y = 0; bool uvlock = false; int weight = 1; };
   struct BlockState;
 
   const Model* load_model(const std::string& name, int depth = 0);

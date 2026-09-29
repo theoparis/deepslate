@@ -9,6 +9,8 @@
 #include "game/player.hpp"
 #include "game/block_updates.hpp"
 #include "game/raycast.hpp"
+#include "render/clouds.hpp"
+#include "render/particles.hpp"
 #include "render/sky.hpp"
 #include "render/ui.hpp"
 #include "render/world_renderer.hpp"
@@ -83,6 +85,9 @@ class Game {
   std::unique_ptr<BlockUpdates> updates_;
   std::unique_ptr<WorldRenderer> wr_;
   std::unique_ptr<SkyRenderer> sky_;
+  std::unique_ptr<Clouds> clouds_;
+  std::unique_ptr<Particles> particles_;
+  Rng fx_rng_{0xFEED};
   std::unique_ptr<Ui> ui_;
 
   Player player_;

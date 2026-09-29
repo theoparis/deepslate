@@ -18,6 +18,7 @@ add_link_options(-fuse-ld=lld)
 option(DEEPSLATE_SYSTEM_DEPS "Use system packages instead of FetchContent" OFF)
 option(DEEPSLATE_BUILD_TESTS "Build the test suite" ON)
 option(DEEPSLATE_NATIVE "Tune for the host CPU (-march=native)" OFF)
+set(DEEPSLATE_SANITIZE "" CACHE STRING "Sanitizers for the game code only, e.g. address,undefined or thread")
 
 # Project-wide options (interface target so third-party code is unaffected).
 add_library(ds_options INTERFACE)
@@ -30,6 +31,10 @@ endif()
 target_compile_options(ds_options INTERFACE -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers)
 if(DEEPSLATE_NATIVE)
   target_compile_options(ds_options INTERFACE -march=native)
+endif()
+if(DEEPSLATE_SANITIZE)
+  target_compile_options(ds_options INTERFACE -fsanitize=${DEEPSLATE_SANITIZE} -fno-omit-frame-pointer -g)
+  target_link_options(ds_options INTERFACE -fsanitize=${DEEPSLATE_SANITIZE})
 endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")

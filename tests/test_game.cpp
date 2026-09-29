@@ -229,6 +229,61 @@ TEST(block_models_bake_from_json) {
   CHECK(std::abs(raised_min(st_s, 0) - 0.0f) < 1e-4f);
 }
 
+TEST(block_models_weighted_variants) {
+  // A pack whose stone blockstate lists four rotated models (as vanilla does) with weights.
+  fs::path dir = temp_dir("variants");
+  fs::create_directories(dir / "assets/minecraft/blockstates");
+  std::ofstream(dir / "pack.mcmeta") << R"({"pack":{"pack_format":1,"description":"t"}})";
+  std::ofstream(dir / "assets/minecraft/blockstates/stone.json") << R"({"variants":{"":[
+    {"model":"minecraft:block/stone"},{"model":"minecraft:block/stone","y":90,"weight":2},
+    {"model":"minecraft:block/stone","y":180},{"model":"minecraft:block/stone","y":270}]}})";
+  PackStack packs;
+  std::string err;
+  CHECK(packs.add_spec(dir.string(), &err));
+  packs.add_builtin_fallback();
+  BlockModels models(packs);
+  models.build();
+  const BakedBlock* b = models.baked(B::stone);
+  CHECK_EQ(b->alts.size(), size_t{4});
+  CHECK_EQ(b->total_weight, 5);
+  CHECK_EQ(b->alts[1].weight, 2);
+  CHECK_EQ(b->quads.size(), size_t{6});
+  // Choice is a pure function of the hash and follows the weights.
+  int counts[4] = {0, 0, 0, 0};
+  for (u64 i = 0; i < 5000; i++) {
+    const auto& q = b->pick(mix64(i));
+    for (size_t k = 0; k < 4; k++) if (&q == &b->alts[k].quads) counts[k]++;
+  }
+  CHECK(counts[1] > counts[0] * 1.6 && counts[1] < counts[0] * 2.4);
+  CHECK(counts[0] > 700 && counts[2] > 700 && counts[3] > 700);
+  CHECK(&b->pick(12345) == &b->pick(12345));
+  // Rotated variants map the same texture onto different faces' uv corners.
+  bool any_diff = false;
+  for (size_t q = 0; q < 6; q++)
+    if (b->alts[0].quads[q].uv[0][0] != b->alts[1].quads[q].uv[0][0] || b->alts[0].quads[q].pos[0][0] != b->alts[1].quads[q].pos[0][0]) any_diff = true;
+  CHECK(any_diff);
+  // Blocks without variant lists have no alternatives.
+  CHECK(models.baked(B::dirt)->alts.empty());
+  fs::remove_all(dir);
+}
+
+TEST(animated_textures_from_mcmeta) {
+  Models m;
+  u16 water = m.models->water_layer();
+  std::vector<float> anim;
+  m.models->copy_anim(anim);
+  CHECK(water != 0);
+  CHECK_EQ(anim[water * 2], 8.0f);       // 8-frame strip
+  CHECK_EQ(anim[water * 2 + 1], 3.0f);   // frametime from the .mcmeta
+  CHECK_EQ(anim[m.models->layer_of("block/stone") * 2], 1.0f);
+  // Frames occupy consecutive layers and differ from each other.
+  std::vector<u8> px;
+  m.models->copy_layers(water, px);
+  size_t layer_bytes = 16 * 16 * 4;
+  CHECK(px.size() >= 8 * layer_bytes);
+  CHECK(std::memcmp(px.data(), px.data() + layer_bytes, layer_bytes) != 0);
+}
+
 TEST(atlas_layers_and_tints) {
   Models m;
   CHECK(m.models->layer_count() > 100);

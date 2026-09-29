@@ -178,7 +178,8 @@ void mesh_section(const MeshInput& in, const BlockModels& models, MeshData& out)
         const bool emissive = bi.flags & BF_Emissive;
         const u32 tint_rgb = bi.tint != Tint::None ? models.tint_color(bi.tint, biome) : 0xFFFFFF;
 
-        for (const BakedQuad& q : baked->quads) {
+        const std::vector<BakedQuad>& quads = baked->pick(hash_coords(0xA17, ox + x, oy + y, oz + z));
+        for (const BakedQuad& q : quads) {
           if (q.cull >= 0) {
             const int nx = x + kDir[q.cull][0], ny = y + kDir[q.cull][1], nz = z + kDir[q.cull][2];
             if (opq_at(nx, ny, nz)) continue;

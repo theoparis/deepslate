@@ -16,6 +16,8 @@ add_library(deepslate_core STATIC
   render/world_renderer.cpp
   render/ui.cpp
   render/sky.cpp
+  render/clouds.cpp
+  render/particles.cpp
   game/player.cpp
   game/raycast.cpp
   game/block_updates.cpp

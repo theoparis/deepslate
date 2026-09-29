@@ -106,6 +106,10 @@ bool Game::init_content(std::string* err) {
   if (!wr_->init(&e)) { *err = "world renderer: " + e; return false; }
   sky_ = std::make_unique<SkyRenderer>();
   if (!sky_->init(packs_, &e)) { *err = "sky renderer: " + e; return false; }
+  clouds_ = std::make_unique<Clouds>();
+  if (!clouds_->init(packs_, &e)) { *err = "clouds: " + e; return false; }
+  particles_ = std::make_unique<Particles>();
+  if (!particles_->init(*models_, wr_->atlas_texture(), &e)) { *err = "particles: " + e; return false; }
   ui_ = std::make_unique<Ui>();
   if (!ui_->init(packs_, *models_, wr_->atlas_texture(), &e)) { *err = "ui: " + e; return false; }
 
@@ -149,6 +153,8 @@ void Game::shutdown() {
   if (!window_ && !world_) return;
   if (store_ && world_) save_all(true);
   wr_.reset();
+  particles_.reset();
+  clouds_.reset();
   updates_.reset();
   ui_.reset();
   sky_.reset();
@@ -400,6 +406,7 @@ void Game::break_block() {
   if (!target_.hit) return;
   const BlockInfo& bi = Blocks::get().info(world_->get_block(target_.x, target_.y, target_.z));
   if (bi.flags & BF_Unbreakable && !player_.creative) return;
+  particles_->emit_break(world_->get_block(target_.x, target_.y, target_.z), target_.x, target_.y, target_.z, fx_rng_);
   world_->set_block(target_.x, target_.y, target_.z, 0);
   updates_->notify(target_.x, target_.y, target_.z);
   // Plants, cacti, reeds and torches cannot float.
@@ -665,6 +672,8 @@ void Game::update(double dt) {
   name_timer_ = std::max(0.0, name_timer_ - dt);
   toast_timer_ = std::max(0.0, toast_timer_ - dt);
 
+  particles_->update(dt, *world_);
+
   // ---- streaming
   world_->update(player_.pos.x(), player_.pos.z(), radius_);
   wr_->update(cam_, radius_);
@@ -711,6 +720,8 @@ void Game::render() {
     if (target_.hit && screen_ == Screen::Playing)
       sky_->draw_box_outline(cam_, {target_.box_min[0], target_.box_min[1], target_.box_min[2]}, {target_.box_max[0], target_.box_max[1], target_.box_max[2]});
     wr_->draw_translucent(cam_, sky);
+    particles_->draw(cam_, sky);
+    if (!player_.eyes_in_water) clouds_->draw(cam_, sky, now_seconds());
   }
 
   ui_->begin(fb_w_, fb_h_);

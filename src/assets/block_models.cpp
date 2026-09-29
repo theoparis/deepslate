@@ -401,6 +401,7 @@ const BlockModels::BlockState* BlockModels::load_blockstate(const std::string& n
           if (!m["y"].get(iv)) r.y = static_cast<int>(iv);
           bool b;
           if (!m["uvlock"].get(b)) r.uvlock = b;
+          if (!m["weight"].get(iv)) r.weight = static_cast<int>(clampv<int64_t>(iv, 1, 1000));
           out.push_back(std::move(r));
         };
         simdjson::dom::array arr;
@@ -591,6 +592,7 @@ void BlockModels::bake_locked(BlockId id) {
     std::string sname = bi.def && !(bi.flags & BF_Unknown) ? bi.def->java_name() : bi.name.substr(bi.name.find(':') + 1);
     const BlockState* bs = load_blockstate(sname);
     std::vector<ModelRef> refs;
+    size_t variant_choices = 0;  // > 1: the first N refs are alternatives, not layers
     if (bs && bs->valid) {
       auto prop = [&](const std::string& k) -> const std::string* {
         for (auto& [pk, pv] : bi.java_props)
@@ -610,7 +612,8 @@ void BlockModels::bake_locked(BlockId id) {
           if (score > best_score) { best_score = score; best = &v; }
         }
         if (!best) best = &bs->variants.front();
-        refs.push_back(best->models.front());
+        for (const ModelRef& r : best->models) refs.push_back(r);
+        variant_choices = refs.size();
       }
       for (auto& part : bs->parts) {
         bool match = !part.has_when;
@@ -626,7 +629,19 @@ void BlockModels::bake_locked(BlockId id) {
       }
     }
     if (refs.empty()) baked->missing = true;
-    for (auto& r : refs) bake_model(r, -1, *baked);
+    if (variant_choices > 1 && refs.size() == variant_choices) {
+      // Weighted alternatives from `variants`: bake each into its own quad list.
+      for (const ModelRef& r : refs) {
+        BakedBlock one;
+        bake_model(r, -1, one);
+        baked->alts.push_back({std::move(one.quads), r.weight});
+        baked->total_weight += r.weight;
+        if (one.missing) baked->missing = true;
+      }
+      baked->quads = baked->alts.front().quads;
+    } else {
+      for (auto& r : refs) bake_model(r, -1, *baked);
+    }
     if (baked->quads.empty()) {
       // Model or blockstate not found in any pack layer: draw a missing-texture cube.
       baked->missing = true;

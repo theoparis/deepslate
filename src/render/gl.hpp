@@ -18,7 +18,7 @@ namespace ds::gl {
   X(VertexAttribPointer) X(DrawElements) X(DrawArrays) X(CreateShader) X(ShaderSource) X(CompileShader) X(GetShaderiv)        \
   X(GetShaderInfoLog) X(CreateProgram) X(AttachShader) X(LinkProgram) X(GetProgramiv) X(GetProgramInfoLog) X(UseProgram)       \
   X(DeleteShader) X(DeleteProgram) X(GetUniformLocation) X(Uniform1i) X(Uniform1f) X(Uniform2f) X(Uniform3f) X(Uniform4f)     \
-  X(UniformMatrix4fv) X(BindAttribLocation) X(Finish) X(PolygonMode)
+  X(UniformMatrix4fv) X(BindAttribLocation) X(Finish) X(PolygonMode) X(ColorMask)
 
 #define X(name) inline decltype(&::gl##name) name = nullptr;
 DS_GL_FUNCS(X)
