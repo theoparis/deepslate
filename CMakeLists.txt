@@ -13,7 +13,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Always link with LLD.
-add_link_options(-fuse-ld=lld)
+add_link_options(-fuse-ld=mold)
 
 option(DEEPSLATE_SYSTEM_DEPS "Use system packages instead of FetchContent" OFF)
 option(DEEPSLATE_BUILD_TESTS "Build the test suite" ON)
