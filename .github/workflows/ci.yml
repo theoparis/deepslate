@@ -1,19 +1,32 @@
 name: ci
-on: [push, pull_request]
+on:
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [dev]
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Install toolchain and SDL build dependencies
+      - uses: actions/checkout@v7
+      - name: Install native dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang lld cmake ninja-build xvfb mesa-utils libgl1-mesa-dri \
-            libx11-dev libxext-dev libxcursor-dev libxi-dev libxrandr-dev libxfixes-dev libxss-dev \
-            libxkbcommon-dev libwayland-dev libgl-dev libegl-dev libasound2-dev libudev-dev libssl-dev
-      - name: Configure
-        run: cmake --preset release
+          sudo apt-get install -y build-essential git xvfb libarchive-dev libssl-dev \
+            libx11-dev libxext-dev libxcursor-dev libxi-dev libxrandr-dev libxfixes-dev \
+            libxkbcommon-dev libgl-dev libegl-dev libasound2-dev
+      - name: Install V and LevelDB
+        run: |
+          git clone https://github.com/vlang/v.git "$HOME/v"
+          git -C "$HOME/v" checkout e140fd7247ec5a72113d665348f856902fa30bb3
+          make -C "$HOME/v"
+          echo "$HOME/v" >> "$GITHUB_PATH"
+          mkdir -p "$HOME/.vmodules"
+          git clone https://github.com/theoparis/v-leveldb.git "$HOME/.vmodules/leveldb"
+          git -C "$HOME/.vmodules/leveldb" checkout b58971f703c9a3468e19b3388e02cfa7c58bbb65
       - name: Build
-        run: cmake --build --preset release
+        run: make -j2
       - name: Test
-        run: ctest --test-dir build/release --output-on-failure
+        run: make test
+      - name: Run Sokol smoke check
+        run: sh tests/smoke.sh ./build/bin/vinecraft "$RUNNER_TEMP"
