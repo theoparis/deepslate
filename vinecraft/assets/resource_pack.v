@@ -71,6 +71,9 @@ pub fn open_dir_pack(path string) !PackSource {
 }
 
 pub fn download_pack(url string) !string {
+	if !url.starts_with('https://') {
+		return error('only HTTPS resource pack URLs are allowed')
+	}
 	mut cache := os.getenv('XDG_CACHE_HOME')
 	if cache == '' {
 		home := os.getenv('HOME')
@@ -80,7 +83,11 @@ pub fn download_pack(url string) !string {
 	os.mkdir_all(cache)!
 	target := os.join_path(cache, sha256.hexhash(url) + '.zip')
 	if os.exists(target) { return target }
-	response := http.get(url)!
+	response := http.fetch(
+		method: .get
+		url: url
+		validate: true
+	)!
 	if response.status_code < 200 || response.status_code >= 400 {
 		return error('download failed: HTTP ${response.status_code}')
 	}
