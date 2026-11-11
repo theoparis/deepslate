@@ -80,7 +80,40 @@ pub fn decode_subchunk(data []u8, mut reg blocks.Registry) !([]blocks.BlockId, i
 	if version == 8 || version == 9 {
 		layers = int(r.u8_())
 		if version == 9 { index = int(i8(r.u8_())) }
-	} else if version != 1 {
+	} else if version == 1 {
+		layers = 1
+	} else if version == 0 || (version >= 2 && version <= 7) {
+		// Legacy pre-paletted subchunk format (1.0 - 1.2):
+		// 4096 bytes block IDs, 2048 bytes block data (nibbles), optional 2048 bytes sky light, optional 2048 bytes block light
+		mut sub := []blocks.BlockId{len: 4096}
+		for i in 0 .. 4096 {
+			b_id := r.u8_()
+			if b_id != 0 {
+				name := match b_id {
+					1 { 'minecraft:stone' }
+					2 { 'minecraft:grass_block' }
+					3 { 'minecraft:dirt' }
+					4 { 'minecraft:cobblestone' }
+					5 { 'minecraft:oak_planks' }
+					7 { 'minecraft:bedrock' }
+					8, 9 { 'minecraft:water' }
+					10, 11 { 'minecraft:lava' }
+					12 { 'minecraft:sand' }
+					13 { 'minecraft:gravel' }
+					14 { 'minecraft:gold_ore' }
+					15 { 'minecraft:iron_ore' }
+					16 { 'minecraft:coal_ore' }
+					17 { 'minecraft:oak_log' }
+					18 { 'minecraft:oak_leaves' }
+					20 { 'minecraft:glass' }
+					50 { 'minecraft:torch' }
+					else { '' }
+				}
+				sub[i] = if name != '' { reg.find(name) } else { blocks.BlockId(b_id) }
+			}
+		}
+		return sub, index
+	} else {
 		return error('unsupported subchunk version')
 	}
 	mut sub := []blocks.BlockId{len: 4096}

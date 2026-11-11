@@ -245,6 +245,7 @@ pub fn (mut w World) set_block(x int, y int, z int, id blocks.BlockId) bool {
 	wide := changed || oi.emit != ni.emit || oi.opaque() != ni.opaque()
 	sec := (y >> 4) - blocks.min_sub
 	ly := y & 15
+	light_changed := oi.emit != ni.emit
 	for dz := if lz == 0 || wide { -1 } else { 0 }; dz <= if lz == 15 || wide { 1 } else { 0 }; dz++ {
 		for dx := if lx == 0 || wide { -1 } else { 0 }; dx <= if lx == 15 || wide { 1 } else { 0 }; dx++ {
 			mut mask := u32(0)
@@ -256,7 +257,7 @@ pub fn (mut w World) set_block(x int, y int, z int, id blocks.BlockId) bool {
 				s := sec + ds
 				if s >= 0 && s < blocks.num_subs { mask |= u32(1) << u32(s) }
 			}
-			w.mark_dirty(cx + dx, cz + dz, if changed { u32(0xffffff) } else { mask })
+			w.mark_dirty(cx + dx, cz + dz, if changed || light_changed { u32(0xffffff) } else { mask })
 		}
 	}
 	return true

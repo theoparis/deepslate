@@ -30,6 +30,16 @@ fn test_chunk_keys_and_subchunk_roundtrip() {
 	v1 << encoded[3..]
 	decoded1, _ := decode_subchunk(v1, mut reg) or { panic(err) }
 	assert decoded1 == sub
+	// Version 0 legacy format (4096 bytes block IDs)
+	mut v0 := [u8(0)]
+	mut v0_blocks := []u8{len: 4096}
+	v0_blocks[0] = 1 // stone
+	v0_blocks[5] = 50 // torch
+	v0 << v0_blocks
+	decoded0, _ := decode_subchunk(v0, mut reg) or { panic(err) }
+	assert decoded0[0] == reg.find('minecraft:stone')
+	assert decoded0[5] == reg.find('minecraft:torch')
+	assert decoded0[1] == 0
 }
 
 fn test_biome_storage_roundtrip() {

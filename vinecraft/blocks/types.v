@@ -170,3 +170,11 @@ pub fn (b BlockInfo) opaque() bool { return b.flags & bf_opaque != 0 }
 pub fn (b BlockInfo) liquid() bool { return b.flags & bf_liquid != 0 }
 
 pub fn (b BlockInfo) replaceable() bool { return b.flags & bf_replaceable != 0 }
+
+pub fn (b BlockInfo) opacity() u8 {
+	if b.opaque() { return 15 }
+	if b.name.contains('water') { return 3 }
+	if b.name.contains('ice') && !b.name.contains('packed') && !b.name.contains('blue') { return 3 }
+	if b.flags & (bf_leaves | bf_plant) != 0 { return 1 }
+	return 1
+}

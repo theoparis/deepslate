@@ -45,12 +45,12 @@ pub:
 
 struct MeshScratch {
 mut:
-	ids    []blocks.BlockId = []blocks.BlockId{len: mesh_volume}
-	opaque []bool           = []bool{len: mesh_volume}
-	sky    []u8             = []u8{len: mesh_volume}
-	light  []u8             = []u8{len: mesh_volume}
+	ids     []blocks.BlockId = []blocks.BlockId{len: mesh_volume}
+	opaque  []bool           = []bool{len: mesh_volume}
+	opacity []u8             = []u8{len: mesh_volume}
+	sky     []u8             = []u8{len: mesh_volume}
+	light   []u8             = []u8{len: mesh_volume}
 }
-
 fn mesh_index(x int, y int, z int) int { return (y * mesh_width + z) * mesh_width + x }
 
 fn local_index(x int, y int, z int) int {
@@ -59,7 +59,7 @@ fn local_index(x int, y int, z int) int {
 
 fn byte_color(v f32) u8 { return u8(math.clamp(v, f32(0), f32(1)) * 255 + 0.5) }
 
-fn flood(mut levels []u8, opaque []bool, mut queue []int) {
+fn flood(mut levels []u8, opaque []bool, opacity []u8, mut queue []int) {
 	mut head := 0
 	for head < queue.len {
 		i := queue[head]
@@ -77,8 +77,12 @@ fn flood(mut levels []u8, opaque []bool, mut queue []int) {
 				continue
 			}
 			j := mesh_index(nx, ny, nz)
-			if opaque[j] || levels[j] >= l - 1 { continue }
-			levels[j] = l - 1
+			if opaque[j] { continue }
+			op := opacity[j]
+			if op >= l { continue }
+			nl := l - op
+			if levels[j] >= nl { continue }
+			levels[j] = nl
 			queue << j
 		}
 	}
@@ -153,6 +157,7 @@ pub fn mesh_section(input &MeshInput, registry &blocks.Registry, mut model model
 				info := cache.get(id)
 				s.ids[index] = id
 				s.opaque[index] = info.opaque()
+				s.opacity[index] = info.opacity()
 				if info.opaque() { continue }
 				sk := if wy >= blocks.max_y || wy >= h {
 					15
@@ -172,8 +177,8 @@ pub fn mesh_section(input &MeshInput, registry &blocks.Registry, mut model model
 			}
 		}
 	}
-	flood(mut s.sky, s.opaque, mut queue)
-	if seeds.len > 0 { flood(mut s.light, s.opaque, mut seeds) }
+	flood(mut s.sky, s.opaque, s.opacity, mut queue)
+	if seeds.len > 0 { flood(mut s.light, s.opaque, s.opacity, mut seeds) }
 	mut result := MeshData{}
 	for y in 0 .. 16 {
 		for z in 0 .. 16 {
@@ -197,7 +202,7 @@ pub fn mesh_section(input &MeshInput, registry &blocks.Registry, mut model model
 				model.bake(id)
 				baked := model.baked(id) or { continue }
 				translucent := info.flags & blocks.bf_translucent != 0
-				emissive := info.flags & blocks.bf_emissive != 0
+				emissive := info.flags & blocks.bf_emissive != 0 || info.emit != 0
 				tint := if info.tint != .none {
 					model.tint_color(info.tint, biome)
 				} else {
@@ -256,8 +261,8 @@ pub fn mesh_section(input &MeshInput, registry &blocks.Registry, mut model model
 							}
 						} else {
 							i := local_index(x, y, z)
-							sk = f32(s.sky[i])
-							bk = f32(s.light[i])
+							sk = if emissive { f32(15) } else { f32(s.sky[i]) }
+							bk = if emissive { f32(15) } else { f32(s.light[i]) }
 						}
 						f := shade * ao
 						vert := Vertex{
