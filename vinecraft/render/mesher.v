@@ -105,7 +105,7 @@ fn (mut c InfoCache) get(id blocks.BlockId) &blocks.BlockInfo {
 	i := int(id)
 	if i >= c.infos.len {
 		mut grow := []&blocks.BlockInfo{len: int(math.max(i + 1, c.reg.count())), init: unsafe { nil }}
-		for k, p in c.infos { grow[k] = p }
+		for k, p in c.infos { unsafe { grow[k] = p } }
 		c.infos = grow
 	}
 	if c.infos[i] == unsafe { nil } {

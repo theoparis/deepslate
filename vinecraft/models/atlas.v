@@ -57,7 +57,7 @@ fn (mut bm BlockModels) add_layer(name string) u16 {
 				}
 				for frame in json_array(field(anim, 'frames')) {
 					if frame is map[string]json2.Any {
-						f := frame.as_map()
+						f := &frame
 						if 'index' in f {
 							reps := if 'time' in f {
 								clamp_int(field(f, 'time').int() / frametime, 1, 16)

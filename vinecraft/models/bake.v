@@ -85,8 +85,8 @@ fn (mut bm BlockModels) bake_locked(id blocks.BlockId) {
 				for v in 0 .. 4 {
 					fv := face_verts[d][v]
 					for a in 0 .. 3 { q.pos[v][a] = f32(fv[a]) }
-					q.uv[v][0] = if fv[3] == 2 || fv[3] == 3 { 1 } else { 0 }
-					q.uv[v][1] = if fv[3] == 1 || fv[3] == 2 { 1 } else { 0 }
+					q.uv[v][0] = if fv[3] == 2 || fv[3] == 3 { f32(1) } else { f32(0) }
+					q.uv[v][1] = if fv[3] == 1 || fv[3] == 2 { f32(1) } else { f32(0) }
 				}
 				baked.quads << q
 			}

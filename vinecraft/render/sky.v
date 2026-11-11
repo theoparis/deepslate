@@ -30,7 +30,7 @@ pub fn sky_state(t TimeOfDay, distance f32) SkyState {
 	sun := t.sun_dir()
 	v := math.clamp((sun.y + 0.18) / 0.4, f32(0), f32(1))
 	day := v * v * (3 - 2 * v)
-	twilight := math.max(f32(0), 1 - f32(math.abs(sun.y)) * 4.5) * 0.55
+	twilight := math.max(f32(0), f32(1) - f32(math.abs(sun.y)) * f32(4.5)) * f32(0.55)
 	mut fog := [3]f32{}
 	night := [f32(0.03), 0.04, 0.09]!
 	daylight := [f32(0.72), 0.83, 1.0]!
@@ -39,5 +39,5 @@ pub fn sky_state(t TimeOfDay, distance f32) SkyState {
 		h := night[i] + (daylight[i] - night[i]) * day
 		fog[i] = h + (warm[i] - h) * twilight
 	}
-	return SkyState{ sky_light: 0.13 + 0.87 * day, fog_color: fog, fog_start: distance * 0.55, fog_end: distance * 0.98 }
+	return SkyState{ sky_light: f32(0.13) + f32(0.87) * day, fog_color: fog, fog_start: distance * f32(0.55), fog_end: distance * f32(0.98) }
 }

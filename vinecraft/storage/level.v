@@ -75,14 +75,14 @@ pub fn (mut s LevelStore) close() ! {
 // Opening LevelDB performs recovery, so no-save mode uses an isolated copy.
 pub fn open_read_only(dir string, seed i64) !&LevelStore {
 	temp := util.temp_dir(util.TempDirOptions{ pattern: 'deepslate-world-*' })!
-	copy := os.join_path(temp, 'world')
+	world_copy := os.join_path(temp, 'world')
 	if os.exists(dir) {
-		os.cp_all(dir, copy, true) or {
+		os.cp_all(dir, world_copy, true) or {
 			os.rmdir_all(temp) or {}
 			return err
 		}
 	}
-	mut s := open(copy, seed) or {
+	mut s := open(world_copy, seed) or {
 		os.rmdir_all(temp) or {}
 		return err
 	}

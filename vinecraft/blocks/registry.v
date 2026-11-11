@@ -53,7 +53,7 @@ pub fn new_registry() &Registry {
 	mut r := &Registry{}
 	defs := builtin_defs()
 	for d in defs { r.defs[d.name] = d }
-	r.add('minecraft:air', [])
+	r.add('minecraft:air', []StateEntry{})
 	for d in defs {
 		if d.name == 'air' { continue }
 		n := full_name(d.name)
@@ -87,7 +87,7 @@ pub fn new_registry() &Registry {
 					r.add(n, [entry('persistent_bit', state_byte(0)),
 						entry('update_bit', state_byte(0))])
 				} else {
-					r.add(n, [])
+					r.add(n, []StateEntry{})
 				}
 			}
 		}
