@@ -257,7 +257,11 @@ pub fn (mut w World) set_block(x int, y int, z int, id blocks.BlockId) bool {
 				s := sec + ds
 				if s >= 0 && s < blocks.num_subs { mask |= u32(1) << u32(s) }
 			}
-			w.mark_dirty(cx + dx, cz + dz, if changed || light_changed { u32(0xffffff) } else { mask })
+			w.mark_dirty(cx + dx, cz + dz, if changed || light_changed {
+				u32(0xffffff)
+			} else {
+				mask
+			})
 		}
 	}
 	return true

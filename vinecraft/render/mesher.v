@@ -51,6 +51,7 @@ mut:
 	sky     []u8             = []u8{len: mesh_volume}
 	light   []u8             = []u8{len: mesh_volume}
 }
+
 fn mesh_index(x int, y int, z int) int { return (y * mesh_width + z) * mesh_width + x }
 
 fn local_index(x int, y int, z int) int {
@@ -109,7 +110,9 @@ fn (mut c InfoCache) get(id blocks.BlockId) &blocks.BlockInfo {
 	i := int(id)
 	if i >= c.infos.len {
 		mut grow := []&blocks.BlockInfo{len: int(math.max(i + 1, c.reg.count())), init: unsafe { nil }}
-		for k, p in c.infos { unsafe { grow[k] = p } }
+		for k, p in c.infos {
+			unsafe { grow[k] = p }
+		}
 		c.infos = grow
 	}
 	if c.infos[i] == unsafe { nil } {

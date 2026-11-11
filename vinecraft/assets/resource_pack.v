@@ -84,8 +84,8 @@ pub fn download_pack(url string) !string {
 	target := os.join_path(cache, sha256.hexhash(url) + '.zip')
 	if os.exists(target) { return target }
 	response := http.fetch(
-		method: .get
-		url: url
+		method:   .get
+		url:      url
 		validate: true
 	)!
 	if response.status_code < 200 || response.status_code >= 400 {
