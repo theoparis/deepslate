@@ -84,7 +84,10 @@ pub fn decode_subchunk(data []u8, mut reg blocks.Registry) !([]blocks.BlockId, i
 		layers = 1
 	} else if version == 0 || (version >= 2 && version <= 7) {
 		// Legacy pre-paletted subchunk format (1.0 - 1.2):
-		// 4096 bytes block IDs, 2048 bytes block data (nibbles), optional 2048 bytes sky light, optional 2048 bytes block light
+		// Requires at least 4096 bytes of block IDs + 2048 bytes of block data
+		if data.len < 1 + 4096 + 2048 {
+			return error('truncated legacy subchunk data')
+		}
 		mut sub := []blocks.BlockId{len: 4096}
 		for i in 0 .. 4096 {
 			b_id := r.u8_()

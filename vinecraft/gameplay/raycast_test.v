@@ -10,13 +10,13 @@ fn (w RayWorld) get_block(x int, y int, z int) blocks.BlockId {
 	return if x == 0 && y == 0 && z == 3 { w.reg.find('stone') } else { blocks.BlockId(0) }
 }
 
-fn (w RayWorld) column_loaded(x int, z int) bool { return true }
+fn (w RayWorld) column_loaded(_ int, _ int) bool { return true }
 
 fn (w RayWorld) block_info(id blocks.BlockId) blocks.BlockInfo { return w.reg.info(id) }
 
-fn (mut w RayWorld) set_block(x int, y int, z int, id blocks.BlockId) bool { return false }
+fn (mut w RayWorld) set_block(_ int, _ int, _ int, _ blocks.BlockId) bool { return false }
 
-fn (mut w RayWorld) fluid_state(id blocks.BlockId, depth int) blocks.BlockId { return id }
+fn (mut w RayWorld) fluid_state(id blocks.BlockId, _ int) blocks.BlockId { return id }
 
 fn (mut w RayWorld) block_id(name string) blocks.BlockId { return w.reg.find(name) }
 

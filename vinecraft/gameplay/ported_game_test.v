@@ -16,7 +16,7 @@ fn (w PortedWorld) get_block(x int, y int, z int) blocks.BlockId {
 	return w.cells[ported_key(x, y, z)] or { 0 }
 }
 
-fn (w PortedWorld) column_loaded(cx int, cz int) bool { return true }
+fn (w PortedWorld) column_loaded(_ int, _ int) bool { return true }
 
 fn (w PortedWorld) block_info(id blocks.BlockId) blocks.BlockInfo { return w.reg.info(id) }
 

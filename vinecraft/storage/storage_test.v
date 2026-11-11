@@ -30,9 +30,9 @@ fn test_chunk_keys_and_subchunk_roundtrip() {
 	v1 << encoded[3..]
 	decoded1, _ := decode_subchunk(v1, mut reg) or { panic(err) }
 	assert decoded1 == sub
-	// Version 0 legacy format (4096 bytes block IDs)
+	// Version 0 legacy format (4096 bytes block IDs + 2048 bytes block data)
 	mut v0 := [u8(0)]
-	mut v0_blocks := []u8{len: 4096}
+	mut v0_blocks := []u8{len: 4096 + 2048}
 	v0_blocks[0] = 1 // stone
 	v0_blocks[5] = 50 // torch
 	v0 << v0_blocks
