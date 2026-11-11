@@ -61,7 +61,7 @@ pub fn (mut p Particles) emit_break(x int, y int, z int, layer u16, tint u32, li
 	if liquid { return }
 	for _ in 0 .. 24 {
 		if p.list.len >= 4000 { break }
-		pos := Vec3d{x + 0.1 + p.random() * 0.8, y + 0.1 + p.random() * 0.8, z + 0.1 + p.random() * 0.8}
+		pos := Vec3d{f64(x) + 0.1 + p.random() * 0.8, f64(y) + 0.1 + p.random() * 0.8, f64(z) + 0.1 + p.random() * 0.8}
 		vel := Vec3d{(p.random() - 0.5) * 3.2, p.random() * 2.6 + 0.4, (p.random() - 0.5) * 3.2}
 		life := 0.5 + p.random() * 0.7
 		size := 0.07 + p.random() * 0.06

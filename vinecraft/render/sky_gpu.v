@@ -49,7 +49,7 @@ pub fn new_sky_gpu(packs &assets.PackStack) SkyGpu {
 	ds.fs.source = &char(dome_fs.str)
 	ds.fs.uniform_blocks[0].size = 96
 	for i, name in [c'forward_tan', c'right_aspect', c'up_glow', c'zenith', c'horizon', c'sun'] {
-		ds.fs.uniform_blocks[0].uniforms[i] = gfx.ShaderUniformDesc{ name: name, type: .float4 }
+		unsafe { ds.fs.uniform_blocks[0].uniforms[i] = gfx.ShaderUniformDesc{ name: name, type: .float4 } }
 	}
 	dome_shader := gfx.make_shader(&ds)
 	dome := gfx.make_pipeline(&gfx.PipelineDesc{ shader: dome_shader })
@@ -135,9 +135,9 @@ pub fn (gpu &SkyGpu) draw(cam Camera, t TimeOfDay, sky SkyState) {
 	len := f32(math.sqrt(f.x * f.x + f.z * f.z))
 	r := Vec3{-f.z / len, 0, f.x / len}
 	u := Vec3{-r.z * f.y, r.z * f.x - r.x * f.z, r.x * f.y}
-	d := f32(math.clamp((sun.y + 0.18) / 0.4, 0, 1))
+	d := f32(math.clamp((sun.y + 0.18) / 0.4, f32(0), f32(1)))
 	day := d * d * (3 - 2 * d)
-	twilight := f32(math.max(0, 1 - math.abs(sun.y) * 4.5))
+	twilight := f32(math.max(f32(0), f32(1) - f32(math.abs(sun.y)) * f32(4.5)))
 	values := [f.x, f.y, f.z, f32(math.tan(cam.fovy * 0.5)), r.x, r.y, r.z, cam.aspect, u.x, u.y,
 		u.z, twilight * 1.2, 0.01 + 0.38 * day, 0.015 + 0.585 * day, 0.05 + 0.93 * day, f32(0),
 		sky.fog_color[0], sky.fog_color[1], sky.fog_color[2], f32(0), sun.x, sun.y, sun.z, f32(0)]!

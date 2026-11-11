@@ -4,7 +4,7 @@ import vinecraft.blocks
 import vinecraft.models
 
 fn fluid_height(b blocks.BlockInfo) f32 {
-	return if b.fluid_depth >= 8 { f32(1) } else { f32(0.889) - 0.111 * b.fluid_depth }
+	return if b.fluid_depth >= 8 { f32(1) } else { f32(0.889) - f32(0.111) * f32(b.fluid_depth) }
 }
 
 fn fluid_same(reg &blocks.Registry, id blocks.BlockId, name string) bool {

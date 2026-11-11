@@ -166,44 +166,13 @@ pub fn export_builtin_pack(dir string) ! {
 	}
 }
 
-#flag -larchive
-#include <archive.h>
-#include <archive_entry.h>
-
-fn C.archive_write_new() voidptr
-fn C.archive_write_set_format_zip(voidptr) int
-fn C.archive_write_open_filename(voidptr, &char) int
-fn C.archive_write_header(voidptr, voidptr) int
-fn C.archive_write_data(voidptr, voidptr, uint) int
-fn C.archive_write_close(voidptr) int
-fn C.archive_write_free(voidptr) int
-fn C.archive_entry_new() voidptr
-fn C.archive_entry_set_pathname(voidptr, &char)
-fn C.archive_entry_set_size(voidptr, i64)
-fn C.archive_entry_set_filetype(voidptr, u32)
-fn C.archive_entry_set_perm(voidptr, int)
-fn C.archive_entry_free(voidptr)
-
 pub fn export_builtin_pack_zip(path string) ! {
-	a := C.archive_write_new()
-	if isnil(a) { return error('cannot allocate zip archive') }
-	defer { C.archive_write_free(a) }
-	if C.archive_write_set_format_zip(a) != 0 || C.archive_write_open_filename(a, path.str) != 0 {
-		return error('cannot open zip archive: ${path}')
-	}
+	mut zip := szip.open(path, .no_compression, .write)!
+	defer { zip.close() }
 	pack := make_builtin_pack()
 	for name in pack.list('') {
 		data := pack.read(name)!
-		e := C.archive_entry_new()
-		C.archive_entry_set_pathname(e, name.str)
-		C.archive_entry_set_size(e, data.len)
-		C.archive_entry_set_filetype(e, 0o100000)
-		C.archive_entry_set_perm(e, 0o644)
-		if C.archive_write_header(a, e) != 0 || C.archive_write_data(a, data.data, uint(data.len)) != data.len {
-			C.archive_entry_free(e)
-			return error('cannot write zip entry: ${name}')
-		}
-		C.archive_entry_free(e)
+		zip.open_entry(name)!
+		zip.write_entry(data)!
 	}
-	if C.archive_write_close(a) != 0 { return error('cannot finish zip archive: ${path}') }
 }
